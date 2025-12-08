@@ -1,0 +1,48 @@
+{
+  "name": "flight-reservation-portal",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "vitest --run --reporter=verbose",
+    "migration": "tsx -r tsconfig-paths/register forge/scripts/migrate.ts",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.11.0",
+    "axios": "^1.13.2",
+    "clsx": "^2.1.1",
+    "crypto": "^1.0.1",
+    "dotenv": "^17.2.3",
+    "lucide-react": "^0.555.0",
+    "mysql2": "^3.15.3",
+    "next": "^16.0.7",
+    "node-fetch": "^2.7.0",
+    "pluralize": "^8.0.0",
+    "react": "19.2.0",
+    "react-circle-flags": "^0.0.25",
+    "react-dom": "19.2.0",
+    "react-icons": "^5.5.0",
+    "react-redux": "^9.2.0",
+    "react-router-dom": "^7.9.6",
+    "react-select": "^5.10.2",
+    "redux": "^5.0.1",
+    "tsx": "^4.20.6",
+    "vitest": "^4.0.10"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/node-fetch": "^2.6.13",
+    "@types/pluralize": "^0.0.33",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "baseline-browser-mapping": "^2.9.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.0.3",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
