@@ -12,16 +12,18 @@ export class CreateUserProfileTable extends Migration {
       table.bigInteger('city_id').unsigned().nullable();
       table.enum('title', ['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.', 'Rev.', 'Hon.']);
       table.string('fname', 100).notNullable();
-      table.string('lname', 100);
-      table.string('profile_url', 100);
-      table.string('code');
-      table.string('mobile');
-      table.boolean('mobile_verified');
-      table.date('date_of_birth');
-      table.json('social_media');
-      table.json('contact_method');
-      table.string('address');
-      table.text('bio');
+      table.string('lname', 100).nullable();
+      table.string('profile_url', 100).nullable();
+      table.string('code').nullable();
+      table.string('mobile', 20).nullable();
+      table.boolean('mobile_verified').nullable();
+      table.string('whatsapp', 20).nullable();
+      table.string('nic', 12).nullable();
+      table.date('date_of_birth').nullable();
+      table.json('social_media').nullable();
+      table.json('contact_method').nullable();
+      table.string('address').nullable();
+      table.text('bio').nullable();
       table.timestamps();
       table.softDeletes();
       

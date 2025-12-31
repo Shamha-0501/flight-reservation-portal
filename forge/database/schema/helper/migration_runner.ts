@@ -51,8 +51,6 @@ export class MigrationRunner {
       Logger.info("Running pending migrations...\n");
     }
 
-    const terminalWidth = process.stdout.columns || 80;
-
     for (const file of files) {
       const name = path.basename(file);
 
@@ -77,8 +75,63 @@ export class MigrationRunner {
       await this.logMigration(name);
 
       this.startLine(name);
-      this.finishLine("DONE", time, true);
+      this.finishLine("DONE", time);
     }
+  }
+
+  /**
+   * SAFE: Rollback all ran migrations (down), clear migrations table, then re-run.
+   * This does NOT touch tables outside your migrations (assuming down() is correct).
+   */
+  async fresh() {
+    await this.ensureMigrationsTable("migrations");
+
+    const ran = await this.getRunMigrations(); // filenames (timestamp_name.ts)
+    if (ran.length === 0) {
+      Logger.info("No migrations to rollback. Running migrations...\n");
+      return this.run();
+    }
+
+    // Build absolute file paths for ran migrations and rollback in reverse order
+    const ranFiles = ran
+      .map((name) => path.join(this.migrationsPath, name))
+      .filter((p) => fs.existsSync(p))
+      .reverse();
+
+    Logger.warn("Rolling back migrations...\n");
+
+    for (const file of ranFiles) {
+      const name = path.basename(file);
+      const mig = await this.loadMigration(file);
+
+      this.startLine(name);
+      this.finishLine("ROLLBACK");
+
+      await mig.down();
+      await this.logRollback(name);
+
+      this.startLine(name);
+      this.finishLine("ROLLED BACK");
+    }
+
+    Logger.success("Rollback complete. Re-running migrations...\n");
+    await this.run();
+  }
+
+  /**
+   * DANGEROUS (guarded): Drops ALL tables in the current database and re-runs migrations.
+   * Allowed ONLY when:
+   * - FORGE_ALLOW_RESET=true
+   * - DB name ends with _dev / _test / _shadow
+   */
+  async resetDatabaseAndMigrate() {
+    Logger.warn("RESET: Dropping ALL tables and re-running migrations...\n");
+
+    const dbName = await this.getCurrentDatabase();
+    this.ensureResetAllowed(dbName);
+
+    await this.dropAllTables(dbName);
+    await this.run();
   }
 
   /**
@@ -121,49 +174,133 @@ export class MigrationRunner {
   }
 
   private async getRunMigrations(): Promise<string[]> {
-    const rows = await DB.query(`SELECT migration FROM migrations`);
-    return rows.map((r) => r.migration);
+    const rows = await DB.query(
+      `
+        SELECT migration
+        FROM migrations
+        WHERE runs > rollbacks
+        ORDER BY migration ASC
+      `
+    );
+    return rows.map((r: any) => r.migration);
   }
 
   private getMigrationFiles(): string[] {
-    console.log(this.migrationsPath.toString());
     return fs
       .readdirSync(this.migrationsPath)
       .filter((f) => f.endsWith(".ts") || f.endsWith(".js"))
+      .sort() // important so they run in timestamp order
       .map((f) => path.join(this.migrationsPath, f));
   }
 
   private async loadMigration(file: string): Promise<any> {
+    // If you re-run in same node process, module cache can bite.
+    // If you face that, I’ll show you a cache-busting import.
     const fileUrl = pathToFileURL(file).href;
-
     const mod = await import(fileUrl);
+
     const MigrationClass = Object.values(mod)[0] as any;
     return new MigrationClass();
   }
 
   private async logMigration(name: string) {
     await DB.query(
-      `INSERT INTO migrations (migration, created_at, updated_at) VALUES (?, NOW(), NOW())`,
+      `
+    INSERT INTO migrations (migration, runs, rollbacks, created_at, updated_at)
+    VALUES (?, 1, 0, NOW(), NOW())
+    ON DUPLICATE KEY UPDATE
+      runs = runs + 1,
+      updated_at = NOW()
+    `,
       [name]
     );
   }
 
+  private async logRollback(name: string) {
+    await DB.query(
+      `
+    INSERT INTO migrations (migration, runs, rollbacks, created_at, updated_at)
+    VALUES (?, 0, 1, NOW(), NOW())
+    ON DUPLICATE KEY UPDATE
+      rollbacks = rollbacks + 1,
+      updated_at = NOW()
+    `,
+      [name]
+    );
+  }
+
+  // -------------------------
+  // Reset helpers (guarded)
+  // -------------------------
+
+  private async getCurrentDatabase(): Promise<string> {
+    const rows = await DB.query(`SELECT DATABASE() AS db`);
+    const dbName = rows?.[0]?.db;
+    if (!dbName)
+      throw new Error("Could not detect current database (SELECT DATABASE())");
+    return dbName;
+  }
+
+  private ensureResetAllowed(dbName: string) {
+    if (process.env.FORGE_ALLOW_RESET !== "true") {
+      throw new Error("Reset blocked. Set FORGE_ALLOW_RESET=true to allow it.");
+    }
+
+    const ok = /(_dev|_test|_shadow)$/i.test(dbName);
+    if (!ok) {
+      throw new Error(
+        `Refusing destructive reset on database "${dbName}". Use a *_dev/_test/_shadow database.`
+      );
+    }
+  }
+
+  private async dropAllTables(dbName: string) {
+    const tables = await DB.query(
+      `SELECT table_name AS name
+       FROM information_schema.tables
+       WHERE table_schema = ? AND table_type = 'BASE TABLE'`,
+      [dbName]
+    );
+
+    if (!tables || tables.length === 0) {
+      Logger.info("No tables found to drop.\n");
+      return;
+    }
+
+    Logger.warn(`Dropping ${tables.length} tables from "${dbName}"...\n`);
+
+    await DB.query(`SET FOREIGN_KEY_CHECKS=0;`);
+
+    for (const t of tables) {
+      const tableName = t.name;
+      await DB.query(`DROP TABLE IF EXISTS \`${tableName}\`;`);
+      this.logLine(`drop ${tableName}`, "DONE");
+    }
+
+    await DB.query(`SET FOREIGN_KEY_CHECKS=1;`);
+
+    Logger.success("All tables dropped.\n");
+  }
+
+  // -------------------------
+  // Fancy console lines
+  // -------------------------
+
   private startLine(name: string) {
     const base = `  ${name} `;
-
     process.stdout.write(base);
     this.currentLineLength = this.visibleLength(base);
   }
 
-  private finishLine(state: string, time?: string, last?: boolean) {
-    const terminalWidth = process.stdout.columns || 80;
-
+  // fixed: no extra newline logic
+  private finishLine(state: string, time?: string) {
     const doneTag = ` ${Logger.colored_text(
       state,
       state === "RUNNING" ? "green" : "yellow"
-    )} ${time ? Logger.colored_text(time, "gray") : ""}${last ? '\n' : ''}`;
+    )} ${time ? Logger.colored_text(time, "gray") : ""}`;
 
     const visibleDone = this.visibleLength(doneTag);
+    const terminalWidth = process.stdout.columns || 80;
 
     const dots = ".".repeat(
       Math.max(2, terminalWidth - this.currentLineLength - visibleDone)
@@ -185,6 +322,10 @@ export class MigrationRunner {
     console.log(`  ${message} ${filled} ${status}`);
   }
 
+  // -------------------------
+  // Name helpers
+  // -------------------------
+
   private makeTimestamp(): string {
     const d = new Date();
     const pad = (n: number) => n.toString().padStart(2, "0");
@@ -201,8 +342,8 @@ export class MigrationRunner {
 
   private cleanClassName(name: string): string {
     return name
-      .replace(/^Create/i, "") // remove Create prefix
-      .replace(/Table$/i, "") // remove Table suffix
+      .replace(/^Create/i, "")
+      .replace(/Table$/i, "")
       .trim();
   }
 
@@ -214,8 +355,8 @@ export class MigrationRunner {
   }
 
   private toTableName(className: string): string {
-    const clean = this.cleanClassName(className); // Remove Create & Table
-    const snake = this.toSnakeCase(clean); // Convert to snake_case
-    return pluralize(snake); // Make plural
+    const clean = this.cleanClassName(className);
+    const snake = this.toSnakeCase(clean);
+    return pluralize(snake);
   }
 }

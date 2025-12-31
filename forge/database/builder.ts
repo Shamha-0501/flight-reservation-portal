@@ -1,5 +1,6 @@
 import type { ResultSetHeader } from "mysql2";
 import { dml, raw, RawSQL, isRaw, QueryValues } from "@/forge/pool/mysql";
+import { Model } from "./model";
 
 type BuilderType = "select" | "insert" | "update" | "delete";
 
@@ -89,6 +90,28 @@ export class QueryBuilder<T = any> {
     queryBuilder._softDeleteColumn = this._softDeleteColumn;
 
     return queryBuilder;
+  }
+
+  /**
+   * COUNT(*) for the current query (keeps WHERE + trashed mode).
+   * Strips ORDER BY / LIMIT / OFFSET.
+   *
+   * Example:
+   *   const total = await query.clone().count();
+   */
+  async count(alias = "total"): Promise<number> {
+    const countQuery = this.clone() as QueryBuilder<any>;
+    countQuery._type = "select";
+    countQuery._columns = [new RawSQL(`COUNT(*) AS \`${alias}\``)];
+    countQuery._orderBy = [];
+    countQuery._limit = undefined;
+    countQuery._offset = undefined;
+
+    const { sql, values } = countQuery.toSQL();
+    const rows = await dml.select<any[]>(sql, values);
+
+    const n = rows?.[0]?.[alias];
+    return typeof n === "number" ? n : Number(n ?? 0);
   }
 
   /**
@@ -238,6 +261,118 @@ export class QueryBuilder<T = any> {
     });
 
     return this;
+  }
+
+  /**
+   * whereIn helper
+   *
+   * Example:
+   *   qb.whereIn("id", [1, 2, 3])
+   */
+  whereIn(column: string | RawSQL, values: any[]): this {
+    // Empty list => condition that never matches
+    if (!values || values.length === 0) {
+      return this.where("1 = 0");
+    }
+
+    const placeholders = values.map(() => "?").join(", ");
+
+    // If column is a RawSQL expression
+    if (isRaw(column)) {
+      const colRaw = column as RawSQL;
+
+      const mergedBindings = [
+        ...this.collectBindings(colRaw.bindings),
+        ...values,
+      ];
+
+      const condRaw = new RawSQL(
+        `${colRaw.sql} IN (${placeholders})`,
+        mergedBindings
+      );
+
+      return this.where(condRaw);
+    }
+
+    // Simple string column name -> backtick it
+    return this.where(`\`${column}\` IN (${placeholders})`, values);
+  }
+
+  // ---------- Raw helpers ----------
+
+  /**
+   * Add a raw select expression with optional bindings.
+   * Example:
+   *   qb.selectRaw("COUNT(*) as total")
+   *   qb.selectRaw("ST_Distance_Sphere(...) as distance", [a, b])
+   */
+  selectRaw(sql: string, bindings?: QueryValues): this {
+    // if current builder was still default ["*"] and user adds raw, keep "*" unless they explicitly changed
+    // (optional behavior; remove this if you want raw to replace "*")
+    this._columns.push(new RawSQL(sql, bindings));
+    return this;
+  }
+
+  /**
+   * Add a raw where as OR.
+   * Example:
+   *   qb.orWhereRaw("name LIKE ?", ["%a%"])
+   */
+  orWhereRaw(sql: string, bindings?: QueryValues): this {
+    this._wheres.push({
+      kind: "basic",
+      bool: "OR",
+      condition: new RawSQL(sql, bindings),
+    });
+    return this;
+  }
+
+  /**
+   * Optional: allow grouping with whereRaw(callback) too
+   * Example:
+   *   qb.whereRaw(q => q.whereRaw("a=1").orWhereRaw("b=2"))
+   */
+  whereRaw(
+    sqlOrCallback:
+      | string
+      | ((q: {
+          whereRaw: (sql: string, bindings?: QueryValues) => any;
+          orWhereRaw: (sql: string, bindings?: QueryValues) => any;
+        }) => void),
+    bindings?: QueryValues
+  ): this {
+    if (typeof sqlOrCallback === "function") {
+      const children: WhereNode[] = [];
+
+      const nested = {
+        whereRaw: (s: string, b?: QueryValues) => {
+          children.push({
+            kind: "basic",
+            bool: "AND",
+            condition: new RawSQL(s, b),
+          });
+          return nested;
+        },
+        orWhereRaw: (s: string, b?: QueryValues) => {
+          children.push({
+            kind: "basic",
+            bool: "OR",
+            condition: new RawSQL(s, b),
+          });
+          return nested;
+        },
+      };
+
+      sqlOrCallback(nested);
+
+      if (children.length > 0) {
+        this._wheres.push({ kind: "group", bool: "AND", children });
+      }
+      return this;
+    }
+
+    // normal whereRaw(sql, bindings)
+    return this.where(new RawSQL(sqlOrCallback, bindings));
   }
 
   /**

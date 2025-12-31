@@ -27,6 +27,8 @@ interface ColumnDefinition {
   unsigned?: boolean;
   nullable?: boolean;
   default?: any;
+  defaultRaw?: string;
+  onUpdateRaw?: string;
   primary?: boolean;
   unique?: boolean;
   autoIncrement?: boolean;
@@ -210,8 +212,8 @@ export class Blueprint {
   }
 
   timestamps(): this {
-    this.datetime("created_at").nullable();
-    this.datetime("updated_at").nullable();
+    this.datetime("created_at").useCurrent();
+    this.datetime("updated_at").useCurrentOnUpdate().nullable();
     return this;
   }
 
@@ -313,6 +315,18 @@ export class Blueprint {
     return api;
   }
 
+  useCurrent(): this {
+    const last = this.columns[this.columns.length - 1];
+    if (last) last.defaultRaw = "CURRENT_TIMESTAMP";
+    return this;
+  }
+
+  useCurrentOnUpdate(): this {
+    const last = this.columns[this.columns.length - 1];
+    if (last) last.onUpdateRaw = "CURRENT_TIMESTAMP";
+    return this;
+  }
+
   // -----------------------
   // Compile to SQL
   // -----------------------
@@ -410,6 +424,18 @@ CREATE TABLE \`${this.table}\` (
       else if (typeof col.default === "string")
         line += ` DEFAULT '${col.default}'`;
       else line += ` DEFAULT ${col.default}`;
+    }
+
+    if (col.defaultRaw !== undefined) {
+      line += ` DEFAULT ${col.defaultRaw}`;
+    } else if (col.default !== undefined) {
+      if (col.default === null) line += " DEFAULT NULL";
+      else if (typeof col.default === "string") line += ` DEFAULT '${col.default}'`;
+      else line += ` DEFAULT ${col.default}`;
+    }
+
+    if (col.onUpdateRaw !== undefined) {
+      line += ` ON UPDATE ${col.onUpdateRaw}`;
     }
 
     if (col.unique) line += " UNIQUE";

@@ -111,6 +111,10 @@ export const raw = {
         return rows as T[];
     },
 
+    async statement(sql: string, values?: QueryValues) {
+       await raw.query(sql, values);
+    },
+
     /**
      * If you want raw access to the pool for advanced stuff.
      * @returns pool

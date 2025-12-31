@@ -2,10 +2,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { AuthController } from "@/src/http/controllers/AuthController";
+import { withApiErrorLog } from "@/forge/runtime/withApi";
 
 const controller = new AuthController();
 
-export async function POST(req: NextRequest) {
+export const POST = withApiErrorLog(async (req: Request) => {
   const cookieStore = cookies();
   const sessionCookie = (await cookieStore).get("session_id");
   const sessionId = sessionCookie?.value ?? null;
@@ -24,4 +25,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json(result.data, { status: result.status });
-}
+});

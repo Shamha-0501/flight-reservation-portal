@@ -7,17 +7,12 @@ export class CreateUserTable extends Migration {
       table.bigIncrements("id");
       table.string('email');
       table.string('password', 256);
-      table.bigInteger('role_id').unsigned().nullable();
-      table.string('remember_token');
-      table.boolean('verified');
-      table.boolean('subscribe_news_letter');
+      table.string('role', 20).nullable();
+      table.string('remember_token').nullable();
+      table.boolean('verified').default(0);
+      table.boolean('subscribe_news_letter').default(0);
       table.timestamps();
       table.softDeletes();
-      
-      table.foreign('role_id')
-        .references('id')
-        .on('roles')
-        .onDelete('CASCADE');
     });
   }
 

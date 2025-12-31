@@ -5,9 +5,9 @@ export class MigrationTable extends Migration {
     async up() {
         await Schema.create('migrations', (table) => {
             table.bigIncrements('id');
-            table.string('migration');
+            table.string('migration').unique();
             table.integer('runs');
-            table.integer('rolebacks');
+            table.integer('rollbacks');
             table.timestamps(); 
         });
     }

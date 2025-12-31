@@ -1,12 +1,13 @@
-// app/api/auth/login/route.ts
+import "@/forge/http/bootstrap";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { AuthController } from "@/src/http/controllers/AuthController";
+import { withApiErrorLog } from "@/forge/runtime/withApi";
 
 const controller = new AuthController();
 
-export async function POST(req: NextRequest) {
-  const result = await controller.login(req as unknown as Request);
+export const POST = withApiErrorLog(async (req: Request) => {
+  const result = await controller.login(req);
 
   if ("errors" in result) {
     return NextResponse.json(
@@ -30,4 +31,4 @@ export async function POST(req: NextRequest) {
   }
 
   return res;
-}
+});

@@ -20,6 +20,6 @@ export class CreateProvinceTable extends Migration {
   }
 
   async down() {
-    await Schema.dropIfExists("provincets");
+    await Schema.dropIfExists("provinces");
   }
 }

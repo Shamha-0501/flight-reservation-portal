@@ -14,7 +14,7 @@ export class Logger {
     private static BG = {
         green: "\x1b[42m",
         red: "\x1b[41m",
-        yellow: "\x1b[43",
+        yellow: "\x1b[43m",
         blue: "\x1b[44m"
     };
 
@@ -47,21 +47,21 @@ export class Logger {
 
     static info(message: string) {
         const tag = this.tag("INFO", "black", "blue");
-        console.log(`${tag} ${message}`);
+        console.log(`${tag} ${message}\n`);
     }
 
     static success(message: string) {
         const tag = this.tag("SUCCESS", "black", "green");
-        console.log(`${tag} ${message}`);
+        console.log(`${tag} ${message}\n`);
     }
 
     static warn(message: string) {
         const tag = this.tag("WARN", "black", "yellow");
-        console.log(`${tag} ${message}`);
+        console.log(`${tag} ${message}\n`);
     }
 
     static error(message: string) {
         const tag = this.tag("ERROR", "white", "red");
-        console.log(`${tag} ${message}`);
+        console.log(`${tag} ${message}\n`);
     }
 }

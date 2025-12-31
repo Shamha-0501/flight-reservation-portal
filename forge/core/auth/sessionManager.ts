@@ -16,25 +16,44 @@ export class SessionManager {
     extra?: Record<string, any>;
   }): Promise<string> {
     const { userId, ip = null, userAgent = null, extra = {} } = params;
+    if (!Number.isFinite(userId)) throw new Error("userId is required");
+
+    const now = new Date();
+    const payload = JSON.stringify({ ...extra, login_at: now.toISOString() });
+
+    const existing = await (DB as any)
+      .table("sessions")
+      .where("`user_id` = ?", [userId])
+      .first();
+
+    if (existing) {
+      await (DB as any)
+        .table("sessions")
+        .where("`user_id` = ?", [userId])
+        .update({
+          payload,
+          ip_address: ip,
+          user_agent: userAgent,
+          last_activity: now,
+        })
+        .exec?.();
+
+      return existing.id; // keep same session id
+    }
 
     const sessionId = crypto.randomUUID().replace(/-/g, "");
-    const now = new Date();
 
-    const payload = JSON.stringify({
-      ...extra,
-      login_at: now.toISOString(),
-    });
-
-    const session = new Session({
-      id: sessionId,
-      user_id: userId,
-      payload,
-      ip_address: ip,
-      user_agent: userAgent,
-      last_activity: now,
-    });
-
-    await session.save();
+    await (DB as any)
+      .table("sessions")
+      .insert({
+        id: sessionId,
+        user_id: userId,
+        payload,
+        ip_address: ip,
+        user_agent: userAgent,
+        last_activity: now,
+      })
+      .exec?.();
 
     return sessionId;
   }
@@ -49,8 +68,7 @@ export class SessionManager {
 
     const last = new Date(sessionRow.last_activity);
     const now = new Date();
-    const diffMinutes =
-      (now.getTime() - last.getTime()) / (1000 * 60);
+    const diffMinutes = (now.getTime() - last.getTime()) / (1000 * 60);
 
     if (diffMinutes > this.SESSION_LIFETIME_MINUTES) {
       // expired → hard delete this session

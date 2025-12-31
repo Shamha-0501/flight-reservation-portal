@@ -1,4 +1,5 @@
 import { PaginatedResult, QueryBuilder } from "@/forge/database/builder";
+import { RelationOne, RelationMany } from "./relation/relation";
 import { ModelCollection } from "@/forge/database/collection/model";
 import { DB } from "@/forge/database/facades/db";
 
@@ -18,6 +19,15 @@ export type LifecycleHandler<M extends Model<any>> = (
   model: M
 ) => Promise<void> | void;
 
+type ModelCtor<TAttrs extends Record<string, any>, M extends Model<TAttrs>> = {
+  new (attrs?: Partial<TAttrs>): M;
+
+  getPrimaryKey(): string;
+  query(): QueryBuilder<TAttrs>;
+  hydrate(row: TAttrs): M;
+  hydrateMany(rows: TAttrs[]): M[];
+};
+
 /**
  * Base Model class. T is the attributes shape, e.g.
  * interface UserAttrs { id: number; name: string; email: string; }
@@ -28,6 +38,8 @@ export abstract class Model<T extends Record<string, any>> {
   // override in subclass
   protected static table: string;
   protected static fillable: string[] = [];
+  protected static hidden: string[] = [];
+  protected static visible: string[] = []; // if non-empty => whitelist mode
   protected static primaryKey: string = "id";
   protected static softDeleteColumn: string | null = "deleted_at";
 
@@ -43,12 +55,61 @@ export abstract class Model<T extends Record<string, any>> {
   // linked-list & collection references (set by ModelCollection)
   protected _prev: this | null = null;
   protected _next: this | null = null;
+  protected _hidden: Set<string> = new Set();
+  protected _visible: Set<string> = new Set();
   protected _collection: ModelCollection<this> | null = null;
   protected _index: number | null = null;
 
   constructor(attrs: Partial<T> = {}) {
     this.defineFillableAccessors();
     this.fill(attrs);
+  }
+
+  /** Hidden columns accessor */
+  static getHidden(): string[] {
+    const self = this as typeof Model;
+    return self.hidden || [];
+  }
+
+  /** Visible columns accessor (whitelist) */
+  static getVisible(): string[] {
+    const self = this as typeof Model;
+    return self.visible || [];
+  }
+
+  /** Hide extra fields for this instance only */
+  makeHidden(keys: (keyof T | string)[]): this {
+    keys.map(String).forEach((k) => this._hidden.add(k));
+    return this;
+  }
+
+  /** Show only these fields for this instance (whitelist) */
+  makeVisible(keys: (keyof T | string)[]): this {
+    keys.map(String).forEach((k) => this._visible.add(k));
+    return this;
+  }
+
+  /** Replace hidden set for this instance */
+  setHidden(keys: (keyof T | string)[]): this {
+    this._hidden = new Set(keys.map(String));
+    return this;
+  }
+
+  /** Replace visible set for this instance */
+  setVisible(keys: (keyof T | string)[]): this {
+    this._visible = new Set(keys.map(String));
+    return this;
+  }
+
+  /** Clear per-instance overrides */
+  clearHidden(): this {
+    this._hidden.clear();
+    return this;
+  }
+
+  clearVisible(): this {
+    this._visible.clear();
+    return this;
   }
 
   // ---------- Static helpers ----------
@@ -327,7 +388,33 @@ export abstract class Model<T extends Record<string, any>> {
   }
 
   toJSON(): Partial<T> {
-    return this.attributes;
+    const ctor = this.constructor as typeof Model;
+
+    const raw = this.attributes as Record<string, any>;
+
+    const staticHidden = new Set(ctor.getHidden().map(String));
+    const staticVisible = new Set(ctor.getVisible().map(String));
+
+    // instance overrides
+    const hidden = new Set<string>([...staticHidden, ...this._hidden]);
+    const visible = new Set<string>([...staticVisible, ...this._visible]);
+
+    const useWhitelist = visible.size > 0;
+
+    const out: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(raw)) {
+      if (hidden.has(key)) continue;
+
+      if (useWhitelist) {
+        if (visible.has(key)) out[key] = value;
+        continue;
+      }
+
+      out[key] = value;
+    }
+
+    return out as Partial<T>;
   }
 
   // ---------- Linked list helpers ----------
@@ -349,6 +436,137 @@ export abstract class Model<T extends Record<string, any>> {
   }
 
   // ---------- Persistence ----------
+
+  /** Insert a single row (fillable-only) */
+  static async insert<TAttrs extends Record<string, any>>(
+    this: typeof Model,
+    attrs: Partial<TAttrs>
+  ) {
+    const table = this.getTable();
+    const fillable = this.getFillable();
+
+    const data: Record<string, any> = {};
+    if (fillable.length === 0) {
+      Object.assign(data, attrs);
+    } else {
+      for (const key of fillable) {
+        if (key in (attrs as any)) data[key] = (attrs as any)[key];
+      }
+    }
+
+    // if PK is missing, do not force it
+    const pk = this.getPrimaryKey();
+    if (data[pk] == null) delete data[pk];
+
+    return await DB.table(table).insert(data).exec();
+  }
+
+  /** Insert many rows (fillable-only) */
+  static async insertMany<TAttrs extends Record<string, any>>(
+    this: typeof Model,
+    rows: Partial<TAttrs>[]
+  ) {
+    if (!rows.length) return;
+
+    const table = this.getTable();
+    const fillable = this.getFillable();
+    const pk = this.getPrimaryKey();
+
+    const dataRows = rows.map((attrs) => {
+      const data: Record<string, any> = {};
+
+      if (fillable.length === 0) {
+        Object.assign(data, attrs);
+      } else {
+        for (const key of fillable) {
+          if (key in (attrs as any)) data[key] = (attrs as any)[key];
+        }
+      }
+
+      if (data[pk] == null) delete data[pk];
+      return data;
+    });
+
+    // IMPORTANT: your QueryBuilder.insert must accept array to do bulk insert
+    return await DB.table(table).insert(dataRows).exec();
+  }
+
+  /**
+   * Safe upsert (works without raw SQL).
+   * For each row:
+   *  - find existing by uniqueBy
+   *  - if exists => update only "update" columns
+   *  - else => insert
+   */
+  static async upsert<TAttrs extends Record<string, any>>(
+    this: typeof Model,
+    rows: Partial<TAttrs>[],
+    opts: {
+      uniqueBy: (keyof TAttrs | string)[];
+      update?: (keyof TAttrs | string)[];
+    }
+  ) {
+    if (!rows.length) return;
+
+    const table = this.getTable();
+    const fillable = this.getFillable();
+    const uniqueBy = opts.uniqueBy.map(String);
+    const updateCols = (opts.update?.map(String) ?? []).filter(Boolean);
+
+    const pickFillable = (attrs: any) => {
+      if (!fillable.length) return { ...attrs };
+      const out: any = {};
+      for (const k of fillable) {
+        if (k in attrs) out[k] = attrs[k];
+      }
+      return out;
+    };
+
+    for (const raw of rows) {
+      const data = pickFillable(raw);
+
+      // Build WHERE clause for uniqueBy
+      const whereParts: string[] = [];
+      const bindings: any[] = [];
+
+      for (const key of uniqueBy) {
+        if (data[key] === undefined) {
+          throw new Error(
+            `${this.name}.upsert(): missing uniqueBy field "${key}" in row`
+          );
+        }
+        whereParts.push(`\`${key}\` = ?`);
+        bindings.push(data[key]);
+      }
+
+      const existing = await DB.table(table)
+        .where(whereParts.join(" AND "), bindings)
+        .first();
+
+      if (!existing) {
+        await DB.table(table).insert(data).exec();
+        continue;
+      }
+
+      // Update only requested columns (or update all non-unique fields if update not provided)
+      const updateData: any = {};
+      const colsToUpdate =
+        updateCols.length > 0
+          ? updateCols
+          : Object.keys(data).filter((k) => !uniqueBy.includes(k));
+
+      for (const col of colsToUpdate) {
+        if (col in data) updateData[col] = data[col];
+      }
+
+      if (Object.keys(updateData).length) {
+        await DB.table(table)
+          .where(whereParts.join(" AND "), bindings)
+          .update(updateData)
+          .exec();
+      }
+    }
+  }
 
   /** Insert or update based on _exists flag */
   async save(): Promise<this> {
@@ -467,6 +685,25 @@ export abstract class Model<T extends Record<string, any>> {
     await DB.table(table).where(`\`${pk}\` = ?`, [id]).restore(softCol).exec();
   }
 
+  /** TRUNCATE table (fast, resets auto-increment) */
+  static async truncate(this: typeof Model) {
+    const table = this.getTable();
+
+    try {
+      await DB.query(`TRUNCATE TABLE \`${table}\``);
+    } catch (e: any) {
+      // MySQL FK restriction
+      if (e?.code === "ER_TRUNCATE_ILLEGAL_FK") {
+        // This WILL work even with FKs (unless ON DELETE RESTRICT with existing rows)
+        await DB.query(`DELETE FROM \`${table}\``);
+        // optional: reset auto increment
+        await DB.query(`ALTER TABLE \`${table}\` AUTO_INCREMENT = 1`);
+        return;
+      }
+      throw e;
+    }
+  }
+
   // ---------- Relations ----------
 
   /**
@@ -475,19 +712,23 @@ export abstract class Model<T extends Record<string, any>> {
    * Example:
    *   // In Post model: post.belongsTo(User, "user_id")
    */
-  async belongsTo<TAttrs extends Record<string, any>, R extends Model<TAttrs>>(
-    Related: { new (attrs: Partial<TAttrs>): R } & typeof Model,
-    foreignKey: keyof T,
-    ownerKey: keyof TAttrs = Related.getPrimaryKey() as keyof TAttrs
-  ): Promise<R | null> {
-    const fkValue = (this._attributes as any)[foreignKey as string];
-    if (fkValue == null) return null;
+  belongsTo<TAttrs extends Record<string, any>, R extends Model<TAttrs>>(
+    Related: ModelCtor<TAttrs, R>,
+    foreignKeyOnThis: keyof T,
+    ownerKeyOnRelated: keyof TAttrs = Related.getPrimaryKey() as keyof TAttrs
+  ) {
+    const rel = new RelationOne<R>(async () => {
+      const fkValue = (this._attributes as any)[String(foreignKeyOnThis)];
+      if (fkValue == null) return null;
 
-    const row = await Related.query<TAttrs>()
-      .where(`\`${String(ownerKey)}\` = ?`, [fkValue])
-      .first();
+      const row = await Related.query()
+        .where(`\`${String(ownerKeyOnRelated)}\` = ?`, [fkValue])
+        .first();
 
-    return row ? (Related.hydrate(row) as R) : null;
+      return row ? (Related.hydrate(row) as R) : null;
+    });
+
+    return rel.asProxy();
   }
 
   /**
@@ -496,21 +737,25 @@ export abstract class Model<T extends Record<string, any>> {
    * Example:
    *   // In User model: user.hasOne(Profile, "user_id")
    */
-  async hasOne<TAttrs extends Record<string, any>, R extends Model<TAttrs>>(
-    Related: { new (attrs: Partial<TAttrs>): R } & typeof Model,
-    foreignKey: keyof TAttrs,
-    localKey: keyof T = (
+  hasOne<TAttrs extends Record<string, any>, R extends Model<TAttrs>>(
+    Related: ModelCtor<TAttrs, R>,
+    foreignKeyOnRelated: keyof TAttrs,
+    localKeyOnThis: keyof T = (
       this.constructor as typeof Model
     ).getPrimaryKey() as keyof T
-  ): Promise<R | null> {
-    const localValue = (this._attributes as any)[localKey as string];
-    if (localValue == null) return null;
+  ) {
+    const rel = new RelationOne<R>(async () => {
+      const localValue = (this._attributes as any)[String(localKeyOnThis)];
+      if (localValue == null) return null;
 
-    const row = await Related.query<TAttrs>()
-      .where(`\`${String(foreignKey)}\` = ?`, [localValue])
-      .first();
+      const row = await Related.query()
+        .where(`\`${String(foreignKeyOnRelated)}\` = ?`, [localValue])
+        .first();
 
-    return row ? (Related.hydrate(row) as R) : null;
+      return row ? (Related.hydrate(row) as R) : null;
+    });
+
+    return rel.asProxy();
   }
 
   /**
@@ -519,20 +764,24 @@ export abstract class Model<T extends Record<string, any>> {
    * Example:
    *   // In User model: user.hasMany(Post, "user_id")
    */
-  async hasMany<TAttrs extends Record<string, any>, R extends Model<TAttrs>>(
-    Related: { new (attrs: Partial<TAttrs>): R } & typeof Model,
-    foreignKey: keyof TAttrs,
-    localKey: keyof T = (
+  hasMany<TAttrs extends Record<string, any>, R extends Model<TAttrs>>(
+    Related: ModelCtor<TAttrs, R>,
+    foreignKeyOnRelated: keyof TAttrs,
+    localKeyOnThis: keyof T = (
       this.constructor as typeof Model
     ).getPrimaryKey() as keyof T
-  ): Promise<R[]> {
-    const localValue = (this._attributes as any)[localKey as string];
-    if (localValue == null) return [];
+  ) {
+    const rel = new RelationMany<R>(async () => {
+      const localValue = (this._attributes as any)[String(localKeyOnThis)];
+      if (localValue == null) return [];
 
-    const rows = await Related.query<TAttrs>()
-      .where(`\`${String(foreignKey)}\` = ?`, [localValue])
-      .get();
+      const rows = await Related.query()
+        .where(`\`${String(foreignKeyOnRelated)}\` = ?`, [localValue])
+        .get();
 
-    return Related.hydrateMany(rows) as R[];
+      return Related.hydrateMany(rows) as R[];
+    });
+
+    return rel.asProxy();
   }
 }

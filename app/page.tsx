@@ -1,4 +1,5 @@
 import ChooseYourPerfectJourney from "@/src/app/shared/components/home/choose";
+import FeatureSection from "@/src/app/shared/components/home/FeatureSection";
 import Hero from "@/src/app/shared/components/home/hero";
 import HowItWorks from "@/src/app/shared/components/home/how";
 import GetAFreeQuote from "@/src/app/shared/components/home/quote";
@@ -14,6 +15,7 @@ export default function Home() {
       noPadding
     >
       <Hero />
+      <FeatureSection />
       <HowItWorks />
       <TrendingDestinations />
       <Why />

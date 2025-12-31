@@ -7,7 +7,8 @@ export class CreateCountryTable extends Migration {
       table.bigIncrements("id");
       table.string('name', 191);
       table.string('alpha_2_code', 2);
-      table.string('alpha_3_code', 191);
+      table.string('alpha_3_code', 3);
+      table.string('capital', 191);
       table.bigInteger('sub_region_id').unsigned().nullable();
       table.double('longitude');
       table.double('latitude');
@@ -18,7 +19,7 @@ export class CreateCountryTable extends Migration {
       
       table.foreign('sub_region_id')
         .references('id')
-        .on('country_regions')
+        .on('country_sub_regions')
         .onDelete('CASCADE');
     });
   }
