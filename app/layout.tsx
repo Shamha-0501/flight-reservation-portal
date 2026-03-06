@@ -1,9 +1,21 @@
 import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/src/app/shared/components/common/navigation/Navbar";
-import { ReduxProvider } from "@/src/app/shared/providers/ReduxProvider";
-import AuthInitializer from "@/src/app/shared/providers/AuthInitializer";
-import Footer from "@/src/app/shared/components/common/footer";
+import { Navbar } from "@/src/shared/common/Navbar";
+import Providers from "@/src/app/providers";
+import { AuthBootstrapper } from "@/src/app/AuthBootstrapper";
+import TenantBootstrapper from "@/src/app/TenantBootstrapper";
+import { BootstrapGate } from "@/src/app/BootstrapGate";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -17,12 +29,22 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen w-full bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
-        <ReduxProvider>
-          <Navbar />
-          <AuthInitializer>{children}</AuthInitializer>
-          <Footer />
-        </ReduxProvider>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <Providers>
+          <BootstrapGate
+            bootstrappers={
+              <>
+                <AuthBootstrapper />
+                <TenantBootstrapper />
+              </>
+            }
+          >
+            <Navbar />
+            {children}
+          </BootstrapGate>
+        </Providers>
       </body>
     </html>
   );

@@ -1,36 +1,47 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { Backend } from "@/forge/core/http";
+import { NextRequest, NextResponse } from "next/server";
 
-import { CorsMiddleware } from "@/forge/core/middlewares/cors";
-import { CSRFIssuerMiddleware } from "@/forge/core/middlewares/csrfIssuer";
-import { CSRFEnforceMiddleware } from "@/forge/core/middlewares/csrfEnforce";
-import { AuthSanctumPopulate } from "@/forge/core/middlewares/authSanctumPopulate";
-import { AuthRequiredMiddleware } from "@/forge/core/middlewares/authRequired";
+const ROOT_DOMAIN = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || "").toLowerCase().trim();
+const RESERVED = new Set(
+  (process.env.NEXT_PUBLIC_RESERVED_SUBDOMAINS || "www,api")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+);
 
-const app = new Backend();
+export const config = { matcher: ["/:path*"] };
 
-// Register aliases
-app.alias("cors", CorsMiddleware);
-app.alias("csrf.issue", CSRFIssuerMiddleware);
-app.alias("csrf", CSRFEnforceMiddleware);
-app.alias("auth.optional", AuthSanctumPopulate);
-app.alias("auth", AuthRequiredMiddleware);
-
-// Global middleware stack
-app.useAliases(["cors", "csrf.issue", "csrf", "auth.optional", "auth"]);
-
-// Later we can extend App to attach extra stacks based on path (groups).
-
-export default function proxy(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-
-  if (pathname.startsWith("/api/auth")) {
-    return NextResponse.next();
-  }
-
-  return app.handle(req);
+function getHostname(req: NextRequest) {
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
+  return host.toLowerCase().split(":")[0];
 }
 
-export const config = {
-  matcher: ["/api/:path*"],
-};
+function extractSubdomain(hostname: string) {
+  if (!ROOT_DOMAIN) return null;
+  const suffix = "." + ROOT_DOMAIN;
+  if (!hostname.endsWith(suffix)) return null;
+
+  const sub = hostname.slice(0, -suffix.length);
+  if (!sub || sub === "www") return null;
+  if (!/^[a-z0-9-]+$/.test(sub)) return null;
+  if (RESERVED.has(sub)) return null;
+  return sub;
+}
+
+export function proxy(req: NextRequest) {
+  const url = req.nextUrl;
+
+  // don’t rewrite next internals, api routes, or files
+  if (url.pathname.startsWith("/_next") || url.pathname.startsWith("/api")) return NextResponse.next();
+  if (/\.[^/]+$/.test(url.pathname)) return NextResponse.next();
+
+  // avoid rewrite loops
+  if (url.pathname.startsWith("/_sites/")) return NextResponse.next();
+
+  const hostname = getHostname(req);
+  const tenant = extractSubdomain(hostname);
+  if (!tenant) return NextResponse.next();
+
+  const rewriteUrl = req.nextUrl.clone();
+  rewriteUrl.pathname = `/_sites/${tenant}` + (rewriteUrl.pathname === "/" ? "" : rewriteUrl.pathname);
+  return NextResponse.rewrite(rewriteUrl);
+}
