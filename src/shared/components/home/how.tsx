@@ -55,7 +55,7 @@ function StepCard({ step }: { step: Step }) {
 
   return (
     <div className="relative group h-full">
-      <div className="relative h-full overflow-hidden rounded-3xl p-8 border border-primary-50 bg-gradient-to-br from-primary-10 to-grayscale-10 transition-all duration-500 hover:shadow-2xl hover:scale-[1.03]">
+      <div className="relative h-full overflow-hidden rounded-3xl p-8 border border-primary-50 bg-gradient-to-br from-primary-50 to-grayscale-50 transition-all duration-500 hover:shadow-2xl hover:scale-[1.03]">
         {/* soft corner bubble */}
         {/* <div className="pointer-events-none absolute -bottom-12 -right-12 h-44 w-44 rounded-full bg-primary-100/60" /> */}
 
