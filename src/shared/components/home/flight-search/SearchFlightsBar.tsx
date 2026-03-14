@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import TripTypeSelector from "./TripTypeSelector";
 import SegmentedBar from "./ui/SegmentedBar";
 import RouteSelector from "./RouteSelector";
@@ -8,28 +9,16 @@ import DateSelector from "./DateSelector";
 import PassengerCabinSelector from "./PassengerCabinSelector";
 import type { TripType, Passengers, CabinClass } from "./types";
 import type { AirportOption } from "./SearchableAirportField";
-import { FlightSearchParams } from "@/src/api/types";
-import useFlightSearch from "@/src/api/hooks/flightSearch/useFlightSearch";
-import { fetchFlights, setFilters } from "@/src/shared/redux/store/flightSearchSlice";
+import { setFilters } from "@/src/shared/redux/store/flightSearchSlice";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch } from "@/src/shared/redux/store";
 
 export default function SearchFlightsBar() {
   const dispatch = useDispatch<AppDispatch>();
+  const router = useRouter();
   const [tripType, setTripType] = useState<TripType>("roundtrip");
   const [origin, setOrigin] = useState<AirportOption | null>(null);
   const [destination, setDestination] = useState<AirportOption | null>(null);
-  // TODO: move searchParams and useFlightSearch in flight search results page later.
-  const [searchParams, setSearchParams] = useState<FlightSearchParams>({
-    origin: "",
-    destination: "",
-    departureDate: "",
-    returnDate: "",
-    adults: 1,
-    children: 0,
-    infants: 0,
-    travelClass: undefined,
-  });
 
   function onSwap() {
     setOrigin(destination);
@@ -63,9 +52,6 @@ export default function SearchFlightsBar() {
   }
 
   const filter = useSelector((state: any) => state.flightSearch.filters);
-  const searchTrigger = useSelector(
-    (state: any) => state.flightSearch.searchTrigger,
-  );
   useEffect(() => {
     dispatch(
       setFilters({
@@ -145,7 +131,19 @@ export default function SearchFlightsBar() {
             hover:bg-blue-700 transition
             w-full lg:w-auto
           "
-          onClick={() => dispatch(fetchFlights(filter))}
+          onClick={() => {
+            const query = new URLSearchParams();
+            if (filter.origin) query.set("from", filter.origin);
+            if (filter.destination) query.set("to", filter.destination);
+            if (filter.departureDate) query.set("depart", filter.departureDate);
+            if (filter.returnDate) query.set("return", filter.returnDate);
+            query.set("adults", String(filter.adults || 1));
+            if (filter.children) query.set("children", String(filter.children));
+            if (filter.infants) query.set("infants", String(filter.infants));
+            if (filter.travelClass) query.set("class", filter.travelClass);
+
+            router.push(`/flights?${query.toString()}`);
+          }}
         >
           Search
         </button>
