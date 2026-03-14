@@ -64,26 +64,26 @@ export const Navbar = () => {
 
   return (
     <header className="w-full border-b border-border bg-bg text-fg">
-      <Container>
+      <Container size="container">
         <div className="mx-auto flex h-14 items-center justify-between max-sm:px-4 sm:h-16">
           {/* Brand */}
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded bg-primary text-lg font-bold text-white">
-              LT
-            </div>
+            {/* <div className="flex h-8 w-8 items-center justify-center rounded bg-primary text-lg font-bold text-white">
+              FP
+            </div> */}
             <span className="text-sm font-semibold sm:text-base">
-              Lanka Tourism
+              Flight <span className="text-primary">Portal</span>
             </span>
           </div>
 
           {/* Desktop nav */}
           <nav className="hidden items-center gap-2 sm:flex sm:gap-3">
-            <a className="text-sm hover:underline" href="#">
+            {/* <a className="text-sm hover:underline" href="#">
               Docs
             </a>
             <a className="text-sm hover:underline" href="#">
               Pricing
-            </a>
+            </a> */}
 
             <ToggleTheme />
 
@@ -133,11 +133,14 @@ export const Navbar = () => {
                   href={"/SignIn"}
                   className="rounded-md px-3 py-2 text-sm text-center font-semibold text-primary border border-primary"
                 >
-                  Sign in
+                  Login
                 </Link>
-                <button className="rounded-md bg-primary px-3 py-2 text-sm text-center font-semibold text-white">
-                  Sign up
-                </button>
+                <Link
+                  href={"/SignUp"}
+                  className="rounded-md bg-primary px-3 py-2 text-sm text-center font-semibold text-white"
+                >
+                  Sign Up
+                </Link>
               </>
             )}
           </nav>
@@ -178,7 +181,7 @@ export const Navbar = () => {
               </div>
 
               <nav className="flex h-[calc(100%-3.5rem)] flex-col gap-1 px-4 py-4">
-                <a
+                {/* <a
                   className="w-full rounded-lg px-3 py-3 text-sm hover:bg-muted"
                   href="#"
                   onClick={() => setOpen(false)}
@@ -191,7 +194,7 @@ export const Navbar = () => {
                   onClick={() => setOpen(false)}
                 >
                   Pricing
-                </a>
+                </a> */}
 
                 <div className="my-3 h-px bg-border" />
 
@@ -205,14 +208,15 @@ export const Navbar = () => {
                     className="w-full rounded-lg px-3 py-3 border border-primary text-sm text-center font-semibold text-primary hover:bg-muted"
                     onClick={() => setOpen(false)}
                   >
-                    Sign in
+                    Login
                   </Link>
-                  <button
+                  <Link
+                    href={"/SignUp"}
                     className="w-full rounded-lg bg-primary px-3 py-3 text-sm text-center font-semibold text-white"
                     onClick={() => setOpen(false)}
                   >
-                    Sign up
-                  </button>
+                    Sign Up
+                  </Link>
                 </div>
               </nav>
             </div>
