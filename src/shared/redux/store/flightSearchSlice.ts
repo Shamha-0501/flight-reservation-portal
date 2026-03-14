@@ -29,7 +29,7 @@ export const fetchFlights = createAsyncThunk(
   "flightSearch/fetchFlights",
   async (params: FlightSearchParams, { rejectWithValue }) => {
     try {
-      const data = await searchFlights(params);
+      const data = await searchFlights({ params });
       return data;
     } catch (error: any) {
       return rejectWithValue(
