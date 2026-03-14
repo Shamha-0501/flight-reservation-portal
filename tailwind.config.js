@@ -13,15 +13,15 @@ module.exports = {
         // ---- CSS variable tokens (from file 1)
         bg: "rgb(var(--bg) / <alpha-value>)",
         fg: "rgb(var(--fg) / <alpha-value>)",
-        primary: "rgb(var(--primary) / <alpha-value>)",
         secondary: "rgb(var(--secondary) / <alpha-value>)",
         border: "rgb(var(--border) / <alpha-value>)",
         muted: "rgb(var(--muted) / <alpha-value>)",
         menu: "rgb(var(--menu) / <alpha-value>)",
         icon: "rgb(var(--icon) / <alpha-value>)",
 
-        // ---- Palette (from file 2) renamed to avoid conflict with `primary`
-        brand: {
+        // ---- Primary palette (supports primary-50..900 + text/bg-primary)
+        primary: {
+          DEFAULT: "rgb(var(--primary) / <alpha-value>)",
           50: "#DEEAFC",
           100: "#C2D8FA",
           200: "#84B1F5",
