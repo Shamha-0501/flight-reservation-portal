@@ -3,6 +3,7 @@ export type FlightSearchParams = {
   destination: string;
   departureDate: string;
   returnDate?: string;
+  trip?: "oneway" | "roundtrip";
   adults: number;
   children?: number;
   infants?: number;
@@ -54,14 +55,25 @@ export type FlightSearchAppliedFilters = {
   stops?: Array<"0" | "1" | "2plus">;
   baggage?: Array<"carryOn" | "checked">;
   airlines?: { include: string[]; exclude: string[] };
-  departureTimes?: {
-    outbound: { min: number; max: number };
-    inbound: { min: number; max: number };
+  departureTime?: {
+    outbound?: { min?: number; max?: number };
+    inbound?: { min?: number; max?: number };
   };
-  durationMinutes?: { min: number; max: number };
-  layovers?: { avoid: string[]; only: string[] };
-  amenities?: { refundable: boolean | null; changeable: boolean | null };
-  minCheckedBags?: number;
+
+  totalDuration?: {
+    min?: number;
+    max?: number;
+  };
+
+  layoverDuration?: {
+    min?: number;
+    max?: number;
+  };
+
+  layoverAirports?: string[];
+
+  refundable?: boolean;
+  changeable?: boolean;
 };
 
 export type FlightSearchResponse = {
