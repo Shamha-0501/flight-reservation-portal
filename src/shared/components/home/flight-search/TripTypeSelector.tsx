@@ -14,7 +14,7 @@ export default function TripTypeSelector({
       value={value}
       onChange={(e) => onChange(e.target.value as TripType)}
       className="
-        h-9 rounded-lg
+        h-10 w-full rounded-lg
         bg-transparent text-white
         border border-white/35
         px-3 text-sm
