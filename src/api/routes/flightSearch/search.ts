@@ -16,6 +16,7 @@ export const searchFlights = async (
       destinationLocationCode: params.destination,
       departureDate: params.departureDate,
       returnDate: params.returnDate || "",
+      trip: params.trip || "roundtrip",
       adults: params.adults,
       children: params.children || 0,
       infants: params.infants || 0,
