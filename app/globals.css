@@ -36,3 +36,13 @@ html[data-theme="dark"] {
   --menu: 33 33 33;
   --icon: 217 217 217;
 }
+
+/* Hide scrollbars but keep scroll behavior */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
