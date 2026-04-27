@@ -2,13 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import type { FlightSearchAppliedFilters, FlightSearchRequest } from "@/src/api/types";
-import { searchFlights } from "@/src/api/routes/flightSearch/search";
+import type { FlightSearchAppliedFilters, FlightSearchFilters, FlightSearchParams, FlightSearchRequest } from "@/src/api/types";
+import {
+  createFlightOfferRequest,
+  fetchFlightOffers,
+} from "@/src/api/routes/flightSearch/search";
 import FlightsFilters from "@/src/shared/components/flights/FlightsFilters";
 import FlightsResultsList from "@/src/shared/components/flights/FlightsResultsList";
 import FlightsSearchBar from "@/src/shared/components/flights/FlightsSearchBar";
 import FlightsResultsHeader from "@/src/shared/components/flights/FlightsResultsHeader";
 import FlightsActiveFiltersBar from "@/src/shared/components/flights/FlightsActiveFiltersBar";
+import { mapDuffelOfferToFlightViewModel } from "@/src/shared/lib/flightsData";
 
 const EMPTY_FILTERS: FlightSearchAppliedFilters = {
   price: undefined,
@@ -24,6 +28,7 @@ export default function FlightsPage() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any[] | null>(null);
   const [meta, setMeta] = useState<any | null>(null);
+  const [offerRequestId, setOfferRequestId] = useState<string | null>(null);
 
   const [uiFilters, setUiFilters] = useState<FlightSearchAppliedFilters>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<FlightSearchAppliedFilters>(EMPTY_FILTERS);
@@ -31,7 +36,7 @@ export default function FlightsPage() {
   const [priceMinInput, setPriceMinInput] = useState<string>("");
   const [priceMaxInput, setPriceMaxInput] = useState<string>("");
 
-  const initialRequest = useMemo<FlightSearchRequest>(() => {
+  const baseSearchParams = useMemo<FlightSearchParams>(() => {
     const origin = searchParams.get("from")?.toUpperCase() || "";
     const destination = searchParams.get("to")?.toUpperCase() || "";
     const departureDate = searchParams.get("depart") || "";
@@ -46,48 +51,40 @@ export default function FlightsPage() {
     const travelClass = searchParams.get("class") || undefined;
 
     return {
-      params: {
-        origin,
-        destination,
-        departureDate,
-        returnDate: returnDate || undefined,
-        trip: isRoundTrip ? "roundtrip" : "oneway",
-        adults,
-        children,
-        infants,
-        travelClass: travelClass as any,
-      },
-      filters: {},
+      origin,
+      destination,
+      departureDate,
+      returnDate: returnDate || undefined,
+      trip: isRoundTrip ? "roundtrip" : "oneway",
+      adults,
+      children,
+      infants,
+      travelClass: travelClass as any,
     };
   }, [searchParams]);
 
-  const requestWithFilters = useMemo<FlightSearchRequest>(() => {
-    return {
-      ...initialRequest,
-      filters: {
-        minPrice: appliedFilters.price?.min,
-        maxPrice: appliedFilters.price?.max,
-        stops: appliedFilters.stops,
-        baggage: appliedFilters.baggage,
-        includeAirlines: appliedFilters.airlines?.include,
-        excludeAirlines: appliedFilters.airlines?.exclude,
-        outDepartMin: appliedFilters.departureTime?.outbound?.min,
-        outDepartMax: appliedFilters.departureTime?.outbound?.max,
-        inDepartMin: appliedFilters.departureTime?.inbound?.min,
-        inDepartMax: appliedFilters.departureTime?.inbound?.max,
-        minDurationMinutes: appliedFilters.totalDuration?.min,
-        maxDurationMinutes: appliedFilters.totalDuration?.max,
-        onlyLayovers: appliedFilters.layoverAirports,
-        refundable: appliedFilters.refundable,
-        changeable: appliedFilters.changeable,
-      },
-    };
-  }, [initialRequest, appliedFilters]);
+  const offersFilters = useMemo<FlightSearchFilters>(() => ({
+    minPrice: appliedFilters.price?.min,
+    maxPrice: appliedFilters.price?.max,
+    stops: appliedFilters.stops,
+    baggage: appliedFilters.baggage,
+    includeAirlines: appliedFilters.airlines?.include,
+    excludeAirlines: appliedFilters.airlines?.exclude,
+    outDepartMin: appliedFilters.departureTime?.outbound?.min,
+    outDepartMax: appliedFilters.departureTime?.outbound?.max,
+    inDepartMin: appliedFilters.departureTime?.inbound?.min,
+    inDepartMax: appliedFilters.departureTime?.inbound?.max,
+    minDurationMinutes: appliedFilters.totalDuration?.min,
+    maxDurationMinutes: appliedFilters.totalDuration?.max,
+    onlyLayovers: appliedFilters.layoverAirports,
+    refundable: appliedFilters.refundable,
+    changeable: appliedFilters.changeable,
+  }), [appliedFilters]);
 
   const hasSearch =
-    Boolean(initialRequest.params.origin) &&
-    Boolean(initialRequest.params.destination) &&
-    Boolean(initialRequest.params.departureDate);
+    Boolean(baseSearchParams.origin) &&
+    Boolean(baseSearchParams.destination) &&
+    Boolean(baseSearchParams.departureDate);
 
   const isDirty = JSON.stringify(uiFilters) !== JSON.stringify(appliedFilters);
 
@@ -170,16 +167,17 @@ export default function FlightsPage() {
 
   useEffect(() => {
     const canSearch =
-      Boolean(requestWithFilters.params.origin) &&
-      Boolean(requestWithFilters.params.destination) &&
-      Boolean(requestWithFilters.params.departureDate) &&
-      Number(requestWithFilters.params.adults) >= 1;
+      Boolean(baseSearchParams.origin) &&
+      Boolean(baseSearchParams.destination) &&
+      Boolean(baseSearchParams.departureDate) &&
+      Number(baseSearchParams.adults) >= 1;
 
     if (!canSearch) {
       setLoading(false);
       setError(null);
       setData(null);
       setMeta(null);
+      setOfferRequestId(null);
       return;
     }
 
@@ -188,10 +186,47 @@ export default function FlightsPage() {
     async function run() {
       setLoading(true);
       setError(null);
+      setData(null);
+      setMeta(null);
       try {
-        const res = await searchFlights(requestWithFilters);
+        const nextOfferRequestId = await createFlightOfferRequest(baseSearchParams);
         if (!cancelled) {
-          setData(res.data ?? []);
+          setOfferRequestId(nextOfferRequestId);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message || "Failed to fetch flights.");
+          setOfferRequestId(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [baseSearchParams]);
+
+  useEffect(() => {
+    if (!offerRequestId) {
+      return;
+    }
+
+    const currentOfferRequestId = offerRequestId;
+    let cancelled = false;
+
+    async function run() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetchFlightOffers(currentOfferRequestId, offersFilters);
+        if (!cancelled) {
+          setData((res.data ?? []).map(mapDuffelOfferToFlightViewModel));
           setMeta(res.meta ?? null);
         }
       } catch (e: any) {
@@ -210,7 +245,7 @@ export default function FlightsPage() {
     return () => {
       cancelled = true;
     };
-  }, [requestWithFilters]);
+  }, [offerRequestId, offersFilters]);
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -284,6 +319,4 @@ export default function FlightsPage() {
     </main>
   );
 }
-
-
 
