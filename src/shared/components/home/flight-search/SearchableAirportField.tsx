@@ -1,50 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-
-export type AirportOption = {
-  name: string;
-  subType: "AIRPORT" | "CITY";
-  iataCode: string; // ✅ added
-  address?: {
-    cityName: string;
-    cityCode: string;
-    countryName: string;
-  };
-};
+import {
+  AirportOption,
+  formatLocationLabel,
+  toTitleCase,
+} from "@/src/shared/lib/airports";
 
 function cx(...c: Array<string | false | undefined | null>) {
   return c.filter(Boolean).join(" ");
-}
-
-/** Basic Title Case + small quality tweaks */
-function toTitleCase(s: string) {
-  return s
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-}
-
-/**
- * ✅ Format required by you:
- * Delhi Indira Gandhi International (DEL)
- */
-function formatLocationLabel(v: AirportOption) {
-  const code = v.iataCode || v.address?.cityCode || "";
-  const city = v.address?.cityName ? toTitleCase(v.address.cityName) : "";
-  const name = v.name ? toTitleCase(v.name) : "";
-
-  // For AIRPORT: City + Airport Name + (IATA)
-  if (v.subType === "AIRPORT") {
-    // if city missing, fall back to just name
-    return `${city ? city + " " : ""}${name} (${code})`.trim();
-  }
-
-  // For CITY: City/Name + (IATA)
-  // (keeps it clean; you can change to `${name} City (${code})` if you want)
-  return `${city || name} (${code})`.trim();
 }
 
 export default function SearchableAirportField({

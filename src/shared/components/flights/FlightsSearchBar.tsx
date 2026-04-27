@@ -3,9 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRightLeft, CalendarDays, Search } from "lucide-react";
-import { useAirport } from "@/src/api/hooks/amadeus/useAirport";
+import { useAirport } from "@/src/api/hooks/duffel/useAirport";
 import TripTypeSelector from "@/src/shared/components/home/flight-search/TripTypeSelector";
 import type { TripType } from "@/src/shared/components/home/flight-search/types";
+import {
+  AirportOption,
+  extractIataCode,
+  formatLocationLabel,
+  toTitleCase,
+} from "@/src/shared/lib/airports";
 
 type SearchForm = {
   tripType: TripType;
@@ -19,17 +25,6 @@ type SearchForm = {
   travelClass: string;
 };
 
-type AirportOption = {
-  name: string;
-  subType: "AIRPORT" | "CITY";
-  iataCode: string;
-  address?: {
-    cityName?: string;
-    cityCode?: string;
-    countryName?: string;
-  };
-};
-
 type CabinOption = {
   value: "ECONOMY" | "PREMIUM_ECONOMY" | "BUSINESS" | "FIRST";
   label: string;
@@ -41,34 +36,6 @@ const CABINS: CabinOption[] = [
   { value: "BUSINESS", label: "Business" },
   { value: "FIRST", label: "First" },
 ];
-
-function toTitleCase(s: string) {
-  return s
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-}
-
-function formatLocationLabel(v: AirportOption) {
-  const code = v.iataCode || v.address?.cityCode || "";
-  const city = v.address?.cityName ? toTitleCase(v.address.cityName) : "";
-  const name = v.name ? toTitleCase(v.name) : "";
-
-  if (v.subType === "AIRPORT") {
-    return `${city ? city + " " : ""}${name} (${code})`.trim();
-  }
-
-  return `${city || name} (${code})`.trim();
-}
-
-function extractIataCode(value: string) {
-  const match = value.match(/\(([A-Z0-9]{3})\)/i);
-  if (match?.[1]) return match[1].toUpperCase();
-  if (/^[A-Z0-9]{3}$/i.test(value.trim())) return value.trim().toUpperCase();
-  return "";
-}
 
 function InputShell({ label, children }: { label: string; children: React.ReactNode }) {
   return (

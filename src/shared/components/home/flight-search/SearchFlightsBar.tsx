@@ -8,8 +8,8 @@ import RouteSelector from "./RouteSelector";
 import DateSelector from "./DateSelector";
 import PassengerCabinSelector from "./PassengerCabinSelector";
 import type { TripType, Passengers, CabinClass } from "./types";
-import type { AirportOption } from "./SearchableAirportField";
 import { setFilters } from "@/src/shared/redux/store/flightSearchSlice";
+import type { AirportOption } from "@/src/shared/lib/airports";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch } from "@/src/shared/redux/store";
 

@@ -3,28 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Segment from "./ui/Segment";
 import SwapButton from "./ui/SwapButton";
-import SearchableAirportField, { AirportOption } from "./SearchableAirportField";
-import { useAirport } from "@/src/api/hooks/amadeus/useAirport";
-import { useDispatch, useSelector } from "react-redux";
-
-// same formatter as SearchableAirportField (keep consistent)
-function toTitleCase(s: string) {
-  return s
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-}
-
-function formatLocationLabel(v: AirportOption) {
-  const code = v.iataCode || v.address?.cityCode || "";
-  const city = v.address?.cityName ? toTitleCase(v.address.cityName) : "";
-  const name = v.name ? toTitleCase(v.name) : "";
-
-  if (v.subType === "AIRPORT") return `${city ? city + " " : ""}${name} (${code})`.trim();
-  return `${city || name} (${code})`.trim();
-}
+import SearchableAirportField from "./SearchableAirportField";
+import { useAirport } from "@/src/api/hooks/duffel/useAirport";
+import { AirportOption, formatLocationLabel } from "@/src/shared/lib/airports";
 
 export default function RouteSelector({
   origin,
@@ -39,8 +20,6 @@ export default function RouteSelector({
   onChangeDestination: (v: AirportOption) => void;
   onSwap: () => void;
 }) {
-  const dispatch = useDispatch();
-  const filter = useSelector((state: any) => state.flightSearch.filters);
   const [originQuery, setOriginQuery] = useState("");
   const [destinationQuery, setDestinationQuery] = useState("");
 
