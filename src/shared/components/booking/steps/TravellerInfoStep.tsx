@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 
@@ -15,15 +15,131 @@ type Traveller = {
 
 type TravellerInfoStepProps = {
   travellers: Traveller[];
+  onPayloadChange?: (payload: TravellerOrderPayload) => void;
 };
+
+export type TravellerFormValue = {
+  title: string;
+  given_name: string;
+  family_name: string;
+  gender: string;
+  born_on: string;
+  nationality: string;
+  passport_number: string;
+  passport_expiry: string;
+  issuing_country: string;
+  loyalty_programme_airline: string;
+  loyalty_programme_number: string;
+};
+
+export type TravellerOrderPassenger = {
+  id: string;
+  type: "adult" | "child" | "infant_without_seat";
+  title: string;
+  given_name: string;
+  family_name: string;
+  born_on: string;
+  gender: string;
+  email?: string;
+  phone_number?: string;
+  loyalty_programme_accounts?: Array<{
+    account_number: string;
+    airline_iata_code: string;
+  }>;
+  infant_passenger_id?: string;
+};
+
+export type TravellerOrderPayload = {
+  passengers: TravellerOrderPassenger[];
+  contact: {
+    email: string;
+    phone_number?: string;
+  };
+};
+
+export type CreateOrderRequestBody = {
+  offer_id: string;
+  passengers: TravellerOrderPassenger[];
+};
+
+export function buildCreateOrderRequestBody(
+  offerId: string,
+  payload: TravellerOrderPayload
+): CreateOrderRequestBody {
+  return {
+    offer_id: offerId,
+    passengers: payload.passengers,
+  };
+}
+
+function mapTravellerType(travellerType: Traveller["type"]) {
+  if (travellerType === "ADULT") return "adult";
+  if (travellerType === "CHILD") return "child";
+  return "infant_without_seat";
+}
+
+function getTravellerSequenceNumber(travellerId: string) {
+  const match = travellerId.match(/-(\d+)$/);
+  return match ? Number(match[1]) : 1;
+}
+
+function buildInfantPassengerLink(
+  traveller: Traveller,
+  adultTravellers: Traveller[]
+) {
+  if (traveller.type !== "INFANT" || adultTravellers.length === 0) {
+    return undefined;
+  }
+
+  const infantNumber = getTravellerSequenceNumber(traveller.id);
+  return adultTravellers[infantNumber - 1]?.id ?? adultTravellers[0]?.id;
+}
+
+function buildLoyaltyProgrammeAccounts(form: TravellerFormValue) {
+  if (!form.loyalty_programme_number.trim()) {
+    return [];
+  }
+
+  return [
+    {
+      account_number: form.loyalty_programme_number.trim(),
+      airline_iata_code: form.loyalty_programme_airline.trim().toUpperCase(),
+    },
+  ];
+}
+
+function buildInitialTravellerFormState(travellers: Traveller[]) {
+  return travellers.reduce<Record<string, TravellerFormValue>>((acc, traveller) => {
+    acc[traveller.id] = {
+      title: "",
+      given_name: "",
+      family_name: "",
+      gender: "",
+      born_on: "",
+      nationality: "",
+      passport_number: "",
+      passport_expiry: "",
+      issuing_country: "",
+      loyalty_programme_airline: "",
+      loyalty_programme_number: "",
+    };
+
+    return acc;
+  }, {});
+}
 
 export default function TravellerInfoStep({
   travellers,
+  onPayloadChange,
 }: TravellerInfoStepProps) {
   const [openId, setOpenId] = useState<string | null>(
     travellers.length ? travellers[0].id : null
   );
+  const [contactEmail, setContactEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState<string | undefined>("");
+  const [travellerForms, setTravellerForms] = useState<Record<string, TravellerFormValue>>(
+    () => buildInitialTravellerFormState(travellers)
+  );
 
   const inputClass =
     "h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
@@ -32,6 +148,57 @@ export default function TravellerInfoStep({
   const toggleTraveller = (id: string) => {
     setOpenId((prev) => (prev === id ? null : id));
   };
+
+  const updateTravellerForm = (
+    travellerId: string,
+    field: keyof TravellerFormValue,
+    value: string
+  ) => {
+    setTravellerForms((prev) => ({
+      ...prev,
+      [travellerId]: {
+        ...prev[travellerId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const orderPayload = useMemo<TravellerOrderPayload>(() => {
+    const adultTravellers = travellers.filter(
+      (traveller) => traveller.type === "ADULT"
+    );
+
+    return {
+      passengers: travellers.map((traveller) => {
+        const form = travellerForms[traveller.id];
+
+        return {
+          id: traveller.id,
+          type: mapTravellerType(traveller.type),
+          title: form.title.trim(),
+          given_name: form.given_name.trim(),
+          family_name: form.family_name.trim(),
+          born_on: form.born_on,
+          gender: form.gender.trim(),
+          email: contactEmail.trim() || undefined,
+          phone_number: phoneNumber || undefined,
+          loyalty_programme_accounts: buildLoyaltyProgrammeAccounts(form),
+          infant_passenger_id: buildInfantPassengerLink(
+            traveller,
+            adultTravellers
+          ),
+        };
+      }),
+      contact: {
+        email: contactEmail.trim(),
+        phone_number: phoneNumber || undefined,
+      },
+    };
+  }, [contactEmail, phoneNumber, travellerForms, travellers]);
+
+  useEffect(() => {
+    onPayloadChange?.(orderPayload);
+  }, [onPayloadChange, orderPayload]);
 
   return (
     <div className="space-y-5">
@@ -56,8 +223,12 @@ export default function TravellerInfoStep({
           <TravellerFormCard
             key={traveller.id}
             traveller={traveller}
+            value={travellerForms[traveller.id]}
             isOpen={openId === traveller.id}
             onToggle={() => toggleTraveller(traveller.id)}
+            onChange={(field, value) =>
+              updateTravellerForm(traveller.id, field, value)
+            }
           />
         ))}
       </div>
@@ -84,6 +255,8 @@ export default function TravellerInfoStep({
                 className={inputClass}
                 placeholder="you@example.com"
                 type="email"
+                value={contactEmail}
+                onChange={(event) => setContactEmail(event.target.value)}
               />
             </div>
 

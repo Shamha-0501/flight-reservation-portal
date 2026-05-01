@@ -10,6 +10,7 @@ import Select, {
   type StylesConfig,
 } from "react-select";
 import countryList from "react-select-country-list";
+import type { TravellerFormValue } from "../TravellerInfoStep";
 
 type Traveller = {
   id: string;
@@ -20,8 +21,10 @@ type Traveller = {
 
 type TravellerFormCardProps = {
   traveller: Traveller;
+  value: TravellerFormValue;
   isOpen: boolean;
   onToggle: () => void;
+  onChange: (field: keyof TravellerFormValue, value: string) => void;
 };
 
 type CountryOption = {
@@ -39,18 +42,20 @@ const travellerIconMap = {
 
 export default function TravellerFormCard({
   traveller,
+  value,
   isOpen,
   onToggle,
+  onChange,
 }: TravellerFormCardProps) {
   const TravellerIcon = travellerIconMap[traveller.type];
   const menuPortalTarget =
     typeof document !== "undefined" ? document.body : null;
-  const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
-  const [passportExpiry, setPassportExpiry] = useState<Date | null>(null);
-  const [nationality, setNationality] = useState<CountryOption | null>(null);
-  const [issuingCountry, setIssuingCountry] = useState<CountryOption | null>(
-    null
-  );
+  const dateOfBirth = value.born_on ? new Date(value.born_on) : null;
+  const passportExpiry = value.passport_expiry ? new Date(value.passport_expiry) : null;
+  const nationality =
+    countryOptions.find((option) => option.value === value.nationality) ?? null;
+  const issuingCountry =
+    countryOptions.find((option) => option.value === value.issuing_country) ?? null;
 
   const inputClass =
     "h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
@@ -175,20 +180,58 @@ export default function TravellerFormCard({
             <div>
               <div className={sectionTitleClass}>Personal details</div>
 
-              <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <div className="mt-3 grid gap-4 md:grid-cols-3">
+                <div>
+                  <label className={labelClass}>Title</label>
+                  <select
+                    className={inputClass}
+                    value={value.title}
+                    onChange={(event) => onChange("title", event.target.value)}
+                  >
+                    <option value="" disabled>
+                      Select title
+                    </option>
+                    <option value="mr">Mr</option>
+                    <option value="mrs">Mrs</option>
+                    <option value="ms">Ms</option>
+                    <option value="miss">Miss</option>
+                    <option value="mx">Mx</option>
+                  </select>
+                </div>
+
                 <div>
                   <label className={labelClass}>First Name</label>
-                  <input className={inputClass} placeholder="John" />
+                  <input
+                    className={inputClass}
+                    placeholder="John"
+                    value={value.given_name}
+                    onChange={(event) =>
+                      onChange("given_name", event.target.value)
+                    }
+                  />
                 </div>
 
                 <div>
                   <label className={labelClass}>Last Name</label>
-                  <input className={inputClass} placeholder="Doe" />
+                  <input
+                    className={inputClass}
+                    placeholder="Doe"
+                    value={value.family_name}
+                    onChange={(event) =>
+                      onChange("family_name", event.target.value)
+                    }
+                  />
                 </div>
+              </div>
 
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
                   <label className={labelClass}>Gender</label>
-                  <select className={inputClass} defaultValue="">
+                  <select
+                    className={inputClass}
+                    value={value.gender}
+                    onChange={(event) => onChange("gender", event.target.value)}
+                  >
                     <option value="" disabled>
                       Select gender
                     </option>
@@ -202,7 +245,9 @@ export default function TravellerFormCard({
                   <label className={labelClass}>Date of Birth</label>
                   <DatePicker
                     selected={dateOfBirth}
-                    onChange={(date: Date | null) => setDateOfBirth(date)}
+                    onChange={(date: Date | null) =>
+                      onChange("born_on", date ? date.toISOString().slice(0, 10) : "")
+                    }
                     dateFormat="dd/MM/yyyy"
                     placeholderText="Select date of birth"
                     maxDate={new Date()}
@@ -227,7 +272,7 @@ export default function TravellerFormCard({
                     options={countryOptions}
                     value={nationality}
                     onChange={(option: SingleValue<CountryOption>) =>
-                      setNationality(option ?? null)
+                      onChange("nationality", option?.value ?? "")
                     }
                     placeholder="Select nationality"
                     isSearchable
@@ -239,14 +284,26 @@ export default function TravellerFormCard({
 
                 <div>
                   <label className={labelClass}>Passport Number</label>
-                  <input className={inputClass} placeholder="N1234567" />
+                  <input
+                    className={inputClass}
+                    placeholder="N1234567"
+                    value={value.passport_number}
+                    onChange={(event) =>
+                      onChange("passport_number", event.target.value)
+                    }
+                  />
                 </div>
 
                 <div>
                   <label className={labelClass}>Passport Expiry</label>
                   <DatePicker
                     selected={passportExpiry}
-                    onChange={(date: Date | null) => setPassportExpiry(date)}
+                    onChange={(date: Date | null) =>
+                      onChange(
+                        "passport_expiry",
+                        date ? date.toISOString().slice(0, 10) : ""
+                      )
+                    }
                     dateFormat="dd/MM/yyyy"
                     placeholderText="Select passport expiry"
                     minDate={new Date()}
@@ -265,13 +322,43 @@ export default function TravellerFormCard({
                     options={countryOptions}
                     value={issuingCountry}
                     onChange={(option: SingleValue<CountryOption>) =>
-                      setIssuingCountry(option ?? null)
+                      onChange("issuing_country", option?.value ?? "")
                     }
                     placeholder="Select issuing country"
                     isSearchable
                     styles={selectStyles}
                     menuPortalTarget={menuPortalTarget}
                     menuPosition="fixed"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 pt-6">
+              <div className={sectionTitleClass}>Frequent flyer</div>
+
+              <div className="mt-3 grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className={labelClass}>Frequent Flyer Airline</label>
+                  <input
+                    className={inputClass}
+                    placeholder="AI"
+                    value={value.loyalty_programme_airline}
+                    onChange={(event) =>
+                      onChange("loyalty_programme_airline", event.target.value)
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Frequent Flyer Number</label>
+                  <input
+                    className={inputClass}
+                    placeholder="Membership number"
+                    value={value.loyalty_programme_number}
+                    onChange={(event) =>
+                      onChange("loyalty_programme_number", event.target.value)
+                    }
                   />
                 </div>
               </div>
