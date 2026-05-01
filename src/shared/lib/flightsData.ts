@@ -10,6 +10,51 @@ function parseDurationToMinutes(duration?: string) {
   return (hours * 60) + minutes;
 }
 
+function formatDurationLabel(totalMinutes?: number) {
+  if (!totalMinutes || totalMinutes <= 0) return "—";
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours && minutes) return `${hours}h ${minutes}m`;
+  if (hours) return `${hours}h`;
+  return `${minutes}m`;
+}
+
+function formatTimeLabel(iso?: string) {
+  if (!iso) return "—";
+
+  return new Date(iso).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatTravelDateLabel(iso?: string) {
+  if (!iso) return "—";
+
+  return new Date(iso).toLocaleDateString([], {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatMoney(amount?: string | number, currency?: string) {
+  const numeric = Number(amount ?? 0);
+  const code = currency ?? "";
+
+  if (!code) return String(amount ?? "—");
+  return `${code} ${numeric.toFixed(2)}`;
+}
+
+function getStopsLabel(stops?: number) {
+  if (!stops || stops <= 0) return "Non-stop";
+  if (stops === 1) return "1 stop";
+  return `${stops} stops`;
+}
+
 function mapDuffelBaggage(offer: any) {
   const passengerBaggages = (offer.slices ?? [])
     .flatMap((slice: any) => slice.segments ?? [])
@@ -151,5 +196,71 @@ export function mapDuffelOfferToFlightViewModel(offer: any) {
         ]
       : [],
     itineraries,
+  };
+}
+
+export function mapDuffelOfferToBookingViewModel(offer: any) {
+  const normalized = mapDuffelOfferToFlightViewModel(offer);
+  const firstSlice = offer.slices?.[0] ?? null;
+  const outboundSegments = normalized.itineraries?.flatMap(
+    (itinerary: any) => itinerary.segments ?? []
+  ) ?? [];
+  const firstSegment = outboundSegments[0] ?? null;
+  const lastSegment = outboundSegments[outboundSegments.length - 1] ?? null;
+  const computed = normalized.computed ?? {};
+  const baggage = computed.baggage ?? {};
+  const checkedCount = Number(baggage.minCheckedBags ?? 0);
+  const carryOnCount = Number(baggage.minCarryOnBags ?? 0);
+  const baggageParts: string[] = [];
+
+  if (checkedCount > 0) {
+    baggageParts.push(
+      `${checkedCount} checked bag${checkedCount === 1 ? "" : "s"}`
+    );
+  }
+
+  if (carryOnCount > 0 || baggage.hasCarryOn) {
+    baggageParts.push(
+      `${Math.max(carryOnCount, 1)} carry-on bag${Math.max(carryOnCount, 1) === 1 ? "" : "s"}`
+    );
+  }
+
+  const segments = (offer.slices ?? []).flatMap((slice: any) =>
+    (slice.segments ?? []).map((segment: any) => ({
+      id: segment.id,
+      from: segment.origin?.iata_code ?? "—",
+      to: segment.destination?.iata_code ?? "—",
+      departTime: formatTimeLabel(segment.departing_at),
+      arriveTime: formatTimeLabel(segment.arriving_at),
+      duration: formatDurationLabel(parseDurationToMinutes(segment.duration)),
+      airline:
+        segment.marketing_carrier?.name ??
+        segment.operating_carrier?.name ??
+        segment.marketing_carrier?.iata_code ??
+        "Airline",
+      flightNumber:
+        segment.marketing_carrier_flight_number ??
+        segment.operating_carrier_flight_number ??
+        "—",
+    }))
+  );
+
+  return {
+    summary: {
+      route: `${firstSlice?.origin?.iata_code ?? firstSegment?.departure?.iataCode ?? "—"} → ${firstSlice?.destination?.iata_code ?? lastSegment?.arrival?.iataCode ?? "—"}`,
+      travelDate: formatTravelDateLabel(firstSegment?.departure?.at),
+      duration: formatDurationLabel(computed.totalDurationMinutes),
+      stops: getStopsLabel(computed.maxStops),
+    },
+    segments,
+    baggageLabel:
+      baggageParts.length > 0
+        ? `Included baggage: ${baggageParts.join(" • ")}`
+        : "Baggage details will be confirmed during booking.",
+    fare: {
+      baseFare: formatMoney(offer.base_amount, offer.base_currency ?? offer.total_currency),
+      taxes: formatMoney(offer.tax_amount, offer.tax_currency ?? offer.total_currency),
+      total: formatMoney(offer.total_amount, offer.total_currency),
+    },
   };
 }

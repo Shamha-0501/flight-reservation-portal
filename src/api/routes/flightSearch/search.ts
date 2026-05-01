@@ -130,6 +130,20 @@ export const fetchFlightOffers = async (
   }
 };
 
+export const getFlightOffer = async (offerId: string): Promise<any> => {
+  try {
+    const response = await http.get(`/api/offers/${offerId}`);
+    return response.data?.data ?? response.data;
+  } catch (error: any) {
+    console.error("Error fetching flight offer:", error);
+    throw new Error(
+      error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Failed to fetch selected flight."
+    );
+  }
+};
+
 export const searchFlights = async (
   request: FlightSearchRequest
 ): Promise<FlightSearchResponse> => {

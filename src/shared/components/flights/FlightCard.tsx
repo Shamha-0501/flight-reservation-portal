@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
 type Props = {
@@ -64,6 +66,7 @@ function DetailChip({ children }: { children: React.ReactNode }) {
 }
 
 export default function FlightCard({ offer, tags = [] }: Props) {
+  const searchParams = useSearchParams();
   const [expanded, setExpanded] = useState(false);
 
   const computed = offer.computed ?? {};
@@ -136,6 +139,35 @@ export default function FlightCard({ offer, tags = [] }: Props) {
       .join("")
       .toUpperCase();
   }, [carrierName]);
+
+  const bookingHref = useMemo(() => {
+    const nextParams = new URLSearchParams();
+    const tenantId = searchParams.get("tenant_id");
+    const adults = searchParams.get("adults");
+    const children = searchParams.get("children");
+    const infants = searchParams.get("infants");
+
+    if (tenantId) nextParams.set("tenant_id", tenantId);
+    if (offer.id) nextParams.set("offerId", offer.id);
+    if (adults) nextParams.set("adults", adults);
+    if (children) nextParams.set("children", children);
+    if (infants) nextParams.set("infants", infants);
+
+    return `/booking?${nextParams.toString()}`;
+  }, [offer.id, searchParams]);
+
+  const handleSelectFlight = () => {
+    if (!offer.id) return;
+
+    try {
+      window.sessionStorage.setItem(
+        `selected-offer:${offer.id}`,
+        JSON.stringify(offer)
+      );
+    } catch {
+      // Ignore storage failures and allow navigation to continue.
+    }
+  };
 
   return (
     <li className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_6px_20px_rgba(15,23,42,0.06)] transition hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)] sm:p-5">
@@ -277,9 +309,13 @@ export default function FlightCard({ offer, tags = [] }: Props) {
             </div>
           </div>
 
-          <button className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800">
+          <Link
+            href={bookingHref}
+            onClick={handleSelectFlight}
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
+          >
             Select Flight
-          </button>
+          </Link>
         </div>
       </div>
 
