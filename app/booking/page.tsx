@@ -1,12 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { getFlightOffer } from "@/src/api/routes/flightSearch/search";
 import BookingLayout from "@/src/shared/components/booking/BookingLayout";
 import ReviewFlightStep from "@/src/shared/components/booking/steps/ReviewFlightStep";
 import BookingSummarySidebar from "@/src/shared/components/booking/summary/BookingSummarySidebar";
-import TravellerInfoStep from "@/src/shared/components/booking/steps/TravellerInfoStep";
+import TravellerInfoStep, {
+  buildCreateOrderRequestBody,
+  type CreateOrderRequestBody,
+  type TravellerOrderPayload,
+} from "@/src/shared/components/booking/steps/TravellerInfoStep";
 import ExtrasStep from "@/src/shared/components/booking/steps/ExtrasStep";
+import PaymentStep from "@/src/shared/components/booking/steps/PaymentStep";
+import { mapDuffelOfferToBookingViewModel } from "@/src/shared/lib/flightsData";
+import type { DuffelPaymentIntent } from "@/src/api/routes/orders/payment";
 
 const STEPS = [
   { id: "review", label: "Review Flight" },
@@ -15,33 +23,6 @@ const STEPS = [
   { id: "review-final", label: "Review" },
   { id: "payment", label: "Payment" },
 ];
-
-const MOCK_FLIGHT = {
-  summary: {
-    route: "CMB → DXB",
-    travelDate: "Fri, 25 Aug 2026",
-    duration: "5h 40m",
-    stops: "Non-stop",
-  },
-  segments: [
-    {
-      id: "seg-1",
-      from: "CMB",
-      to: "DXB",
-      departTime: "09:40",
-      arriveTime: "12:10",
-      duration: "5h 40m",
-      airline: "Emirates",
-      flightNumber: "EK 655",
-    },
-  ],
-  baggageLabel: "Included baggage: 25kg",
-  fare: {
-    baseFare: "$420.00",
-    taxes: "$86.00",
-    total: "$506.00",
-  },
-};
 
 const buildTravellersFromCounts = (
   adults: number,
@@ -76,8 +57,15 @@ const buildTravellersFromCounts = (
 export default function BookingPage() {
   const searchParams = useSearchParams();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [selectedFlight, setSelectedFlight] = useState<any | null>(null);
+  const [loadingFlight, setLoadingFlight] = useState(false);
+  const [flightError, setFlightError] = useState<string | null>(null);
+  const travellerOrderPayloadRef = useRef<TravellerOrderPayload | null>(null);
+  const orderRequestBodyRef = useRef<CreateOrderRequestBody | null>(null);
+  const paymentIntentRef = useRef<DuffelPaymentIntent | null>(null);
 
   const tenantId = searchParams.get("tenant_id") || "agent-aurora";
+  const offerId = searchParams.get("offerId") || "";
   const adults = Number(searchParams.get("adults") || 1);
   const children = Number(searchParams.get("children") || 0);
   const infants = Number(searchParams.get("infants") || 0);
@@ -90,6 +78,72 @@ export default function BookingPage() {
     if (tenantId === "agent-skyline") return "Skyline Tickets";
     return "Aurora Travels";
   }, [tenantId]);
+  const passengersLabel = useMemo(() => {
+    const parts: string[] = [];
+
+    if (adults > 0) parts.push(`${adults} adult${adults === 1 ? "" : "s"}`);
+    if (children > 0) parts.push(`${children} child${children === 1 ? "" : "ren"}`);
+    if (infants > 0) parts.push(`${infants} infant${infants === 1 ? "" : "s"}`);
+
+    return parts.join(", ");
+  }, [adults, children, infants]);
+
+  useEffect(() => {
+    if (!offerId) {
+      setSelectedFlight(null);
+      setFlightError("Selected flight was not provided.");
+      setLoadingFlight(false);
+      return;
+    }
+
+    let cancelled = false;
+    const snapshotKey = `selected-offer:${offerId}`;
+
+    function getStoredOfferSnapshot() {
+      try {
+        const raw = window.sessionStorage.getItem(snapshotKey);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    }
+
+    async function run() {
+      setLoadingFlight(true);
+      setFlightError(null);
+
+      try {
+        const offer = await getFlightOffer(offerId);
+        if (!cancelled) {
+          setSelectedFlight(mapDuffelOfferToBookingViewModel(offer));
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          const fallbackOffer = getStoredOfferSnapshot();
+
+          if (fallbackOffer) {
+            setSelectedFlight(mapDuffelOfferToBookingViewModel(fallbackOffer));
+            setFlightError(
+              "Live fare confirmation is temporarily unavailable. Showing the selected flight snapshot."
+            );
+          } else {
+            setSelectedFlight(null);
+            setFlightError(error?.message || "Failed to load selected flight.");
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingFlight(false);
+        }
+      }
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [offerId]);
 
   const onNext = () => {
     setCurrentStepIndex((prev) => Math.min(prev + 1, STEPS.length - 1));
@@ -111,26 +165,54 @@ export default function BookingPage() {
       sidebar={
         <BookingSummarySidebar
           agentName={agentName}
-          route={MOCK_FLIGHT.summary.route}
-          travelDate={MOCK_FLIGHT.summary.travelDate}
-          passengers="1 adult"
-          baseFare={MOCK_FLIGHT.fare.baseFare}
-          taxes={MOCK_FLIGHT.fare.taxes}
-          total={MOCK_FLIGHT.fare.total}
+          route={selectedFlight?.summary.route ?? "Select a flight"}
+          travelDate={selectedFlight?.summary.travelDate ?? "—"}
+          passengers={passengersLabel || "—"}
+          baseFare={selectedFlight?.fare.baseFare ?? "—"}
+          taxes={selectedFlight?.fare.taxes ?? "—"}
+          total={selectedFlight?.fare.total ?? "—"}
         />
       }
     >
       {currentStepIndex === 0 && (
-        <ReviewFlightStep
-          summary={MOCK_FLIGHT.summary}
-          segments={MOCK_FLIGHT.segments}
-          baggageLabel={MOCK_FLIGHT.baggageLabel}
-          fare={MOCK_FLIGHT.fare}
-        />
+        <>
+          {loadingFlight ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
+              Loading selected flight...
+            </div>
+          ) : flightError ? (
+            <div
+              className={`rounded-2xl border p-6 text-sm ${
+                selectedFlight
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : "border-rose-200 bg-rose-50 text-rose-700"
+              }`}
+            >
+              {flightError}
+            </div>
+          ) : null}
+
+          {!loadingFlight && selectedFlight ? (
+            <ReviewFlightStep
+              summary={selectedFlight.summary}
+              segments={selectedFlight.segments}
+              baggageLabel={selectedFlight.baggageLabel}
+              fare={selectedFlight.fare}
+            />
+          ) : null}
+        </>
       )}
 
       {currentStepIndex === 1 && (
-        <TravellerInfoStep travellers={travellers} />
+        <TravellerInfoStep
+          travellers={travellers}
+          onPayloadChange={(payload) => {
+            travellerOrderPayloadRef.current = payload;
+            orderRequestBodyRef.current = offerId
+              ? buildCreateOrderRequestBody(offerId, payload)
+              : null;
+          }}
+        />
       )}
 
       {currentStepIndex === 2 && (
@@ -230,10 +312,20 @@ export default function BookingPage() {
   />
 )}
 
-      {currentStepIndex > 2 && (
+      {currentStepIndex === 3 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
           Step UI coming soon.
         </div>
+      )}
+
+      {currentStepIndex === 4 && (
+        <PaymentStep
+          offerId={offerId}
+          amountLabel={selectedFlight?.fare.total}
+          onPaymentConfirmed={(paymentIntent) => {
+            paymentIntentRef.current = paymentIntent;
+          }}
+        />
       )}
     </BookingLayout>
   );
