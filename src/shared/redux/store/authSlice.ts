@@ -1,6 +1,5 @@
 import { csrf, http } from "@/src/api/config/http";
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import { redirectToTenantIfNeeded, redirectToBase } from "@/src/utils/tenant";
 
 type Tenant = {
   id: number;
@@ -177,10 +176,6 @@ const authSlice = createSlice({
         s.user = a.payload;
         s.authStatus = "authenticated";
         s.requestStatus = "idle";
-
-        if (typeof window !== "undefined") {
-          redirectToTenantIfNeeded(a.payload, "/");
-        }
       })
       .addCase(login.rejected, (s, a: any) => {
         s.user = null;
@@ -200,10 +195,6 @@ const authSlice = createSlice({
         s.user = a.payload;
         s.authStatus = "authenticated";
         s.requestStatus = "idle";
-
-        if (typeof window !== "undefined") {
-          redirectToTenantIfNeeded(a.payload, "/");
-        }
       })
       .addCase(register.rejected, (s, a: any) => {
         s.requestStatus = "error";
@@ -222,10 +213,6 @@ const authSlice = createSlice({
         s.authStatus = "guest";
         s.requestStatus = "idle";
         s.error = null;
-
-        if (typeof window !== "undefined") {
-          redirectToBase("/SignIn"); // or "/"
-        }
       })
       .addCase(logout.rejected, (s, a: any) => {
         // If logout fails, keep user as-is, but show error
