@@ -8,6 +8,7 @@ import {
   createPaymentIntent,
   type DuffelPaymentIntent,
 } from "@/src/api/routes/orders/payment";
+import EmailVerificationModal from "./components/EmailVerificationModal";
 
 const DuffelPayments = dynamic(
   async () => (await import("@duffel/components")).DuffelPayments,
@@ -17,13 +18,23 @@ const DuffelPayments = dynamic(
 type PaymentStepProps = {
   offerId: string;
   amountLabel?: string;
-  onPaymentConfirmed?: (paymentIntent: DuffelPaymentIntent) => void;
+  onPaymentConfirmed?: (paymentIntent: DuffelPaymentIntent) => void | Promise<void>;
+  emailVerificationRequired?: boolean;
+  emailVerificationCompleted?: boolean;
+  onEmailVerificationSuccess?: (email: string) => void;
+  initialVerificationEmail?: string;
+  onVerificationLoginRequired?: (email: string, message?: string) => void;
 };
 
 export default function PaymentStep({
   offerId,
   amountLabel,
   onPaymentConfirmed,
+  emailVerificationRequired = true,
+  emailVerificationCompleted = false,
+  onEmailVerificationSuccess,
+  initialVerificationEmail,
+  onVerificationLoginRequired,
 }: PaymentStepProps) {
   const [paymentIntent, setPaymentIntent] = useState<DuffelPaymentIntent | null>(
     null
@@ -34,6 +45,13 @@ export default function PaymentStep({
   const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<
     string | null
   >(null);
+  const [verificationOpen, setVerificationOpen] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
+
+  const isVerificationDone =
+    emailVerificationCompleted || Boolean(verifiedEmail);
+  const requiresVerificationNow =
+    emailVerificationRequired && !isVerificationDone;
 
   useEffect(() => {
     if (!offerId) {
@@ -55,10 +73,10 @@ export default function PaymentStep({
         if (!cancelled) {
           setPaymentIntent(createdIntent);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (!cancelled) {
           setPaymentIntent(null);
-          setPaymentError(error?.message || "Failed to initialise payment.");
+          setPaymentError(getErrorMessage(error, "Failed to initialise payment."));
         }
       } finally {
         if (!cancelled) {
@@ -91,12 +109,21 @@ export default function PaymentStep({
     try {
       const confirmedIntent = await confirmPaymentIntent(paymentIntent.id);
       setPaymentIntent(confirmedIntent);
-      setPaymentSuccessMessage(
-        "Card payment was collected successfully and the payment intent is confirmed."
-      );
-      onPaymentConfirmed?.(confirmedIntent);
-    } catch (error: any) {
-      setPaymentError(error?.message || "Payment confirmation failed.");
+      setPaymentSuccessMessage("Card payment was confirmed.");
+
+      try {
+        await onPaymentConfirmed?.(confirmedIntent);
+        setPaymentSuccessMessage("Card payment was confirmed and the order was created.");
+      } catch (orderError: unknown) {
+        setPaymentError(
+          getErrorMessage(
+            orderError,
+            "Payment was confirmed, but order creation failed."
+          )
+        );
+      }
+    } catch (error: unknown) {
+      setPaymentError(getErrorMessage(error, "Payment confirmation failed."));
     } finally {
       setConfirmingIntent(false);
     }
@@ -137,6 +164,29 @@ export default function PaymentStep({
         </div>
 
         <div className="space-y-4 p-5 sm:p-6">
+          {requiresVerificationNow ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="text-sm font-semibold text-amber-900">
+                Verify email before final booking confirmation
+              </div>
+              <p className="mt-1 text-sm text-amber-800">
+                We&apos;ll send a one-time code to link this booking securely to
+                your verified email account.
+              </p>
+              <button
+                type="button"
+                onClick={() => setVerificationOpen(true)}
+                className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                Verify email
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+              Email verified{verifiedEmail ? `: ${verifiedEmail}` : ""}
+            </div>
+          )}
+
           {loadingIntent ? (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
               Preparing secure payment form...
@@ -161,7 +211,7 @@ export default function PaymentStep({
             </div>
           ) : null}
 
-          {paymentIntent?.client_token ? (
+          {paymentIntent?.client_token && !requiresVerificationNow ? (
             <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5">
               <DuffelPayments
                 paymentIntentClientToken={paymentIntent.client_token}
@@ -191,6 +241,28 @@ export default function PaymentStep({
           ) : null}
         </div>
       </section>
+
+      <EmailVerificationModal
+        open={verificationOpen}
+        onClose={() => setVerificationOpen(false)}
+        initialEmail={initialVerificationEmail}
+        onLoginRequired={(email, message) => {
+          setVerificationOpen(false);
+          setPaymentError(
+            message ||
+              "This email is already registered. Please sign in to continue booking."
+          );
+          onVerificationLoginRequired?.(email, message);
+        }}
+        onVerified={(email) => {
+          setVerifiedEmail(email);
+          onEmailVerificationSuccess?.(email);
+        }}
+      />
     </div>
   );
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
