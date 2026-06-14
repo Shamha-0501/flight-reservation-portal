@@ -19,96 +19,113 @@ export default function Stepper({
   currentStepIndex,
   onStepChange,
 }: StepperProps) {
+  const progress =
+    steps.length <= 1 ? 0 : (currentStepIndex / (steps.length - 1)) * 100;
+
   return (
-    <div className="relative">
-      <div className="absolute left-0 right-0 top-5 hidden h-[3px] rounded-full bg-slate-200 md:block">
-        <div
-          className="h-full rounded-full bg-blue-600 transition-all duration-300 ease-out"
-          style={{
-            width:
-              steps.length <= 1
-                ? "0%"
-                : `${(currentStepIndex / (steps.length - 1)) * 100}%`,
-          }}
-        />
+    <nav aria-label="Booking progress" className="relative">
+      <div className="mb-3 flex items-center justify-between md:hidden">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">
+            Step {currentStepIndex + 1} of {steps.length}
+          </p>
+          <h2 className="mt-1 text-base font-bold text-slate-950">
+            {steps[currentStepIndex]?.label}
+          </h2>
+        </div>
+        <div className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+          {Math.round(progress)}%
+        </div>
       </div>
 
-      <div className="relative z-10 grid grid-cols-2 gap-4 md:grid-cols-5 md:gap-2">
-        {steps.map((step, index) => {
-          const isCompleted = index < currentStepIndex;
-          const isCurrent = index === currentStepIndex;
-          const isDisabled = index > currentStepIndex;
+      <div className="relative hidden md:block">
+        <div className="absolute left-0 right-0 top-5 h-[3px] rounded-full bg-slate-200">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-blue-600 to-sky-500 transition-all duration-500 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
 
-          return (
-            <button
-              key={step.id}
-              type="button"
-              onClick={() => !isDisabled && onStepChange(index)}
-              disabled={isDisabled}
-              className={clsx(
-                "group flex items-start gap-3 rounded-2xl p-2 text-left transition md:flex-col md:items-center md:rounded-none md:p-0",
-                !isDisabled && "cursor-pointer",
-                isDisabled && "cursor-not-allowed"
-              )}
-            >
-              <span
+        <div className="relative z-10 grid grid-cols-5 gap-2">
+          {steps.map((step, index) => {
+            const isCompleted = index < currentStepIndex;
+            const isCurrent = index === currentStepIndex;
+            const isDisabled = index > currentStepIndex;
+
+            return (
+              <button
+                key={step.id}
+                type="button"
+                onClick={() => !isDisabled && onStepChange(index)}
+                disabled={isDisabled}
+                aria-current={isCurrent ? "step" : undefined}
                 className={clsx(
-                  "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border text-sm font-bold transition-all duration-200",
-                  isCurrent &&
-                    "border-blue-600 bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.28)]",
-                  isCompleted &&
-                    "border-blue-200 bg-white text-blue-600 shadow-sm",
-                  isDisabled &&
-                    "border-slate-200 bg-slate-100 text-slate-400"
+                  "group flex flex-col items-center text-center outline-none transition",
+                  !isDisabled && "cursor-pointer",
+                  isDisabled && "cursor-not-allowed"
                 )}
               >
-                {isCompleted ? (
-                  <svg
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    className="h-5 w-5"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M5 10.5L8.5 14L15 7.5"
-                      stroke="currentColor"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                ) : (
-                  index + 1
-                )}
-              </span>
-
-              <div className="min-w-0 md:text-center">
-                <div
+                <span
                   className={clsx(
-                    "text-[11px] font-semibold uppercase tracking-[0.18em]",
+                    "flex h-10 w-10 items-center justify-center rounded-xl border text-sm font-bold transition-all duration-200",
+                    isCurrent &&
+                      "border-blue-600 bg-blue-600 text-white shadow-[0_10px_24px_rgba(37,99,235,0.28)] ring-4 ring-blue-50",
+                    isCompleted &&
+                      "border-blue-200 bg-white text-blue-600 shadow-sm group-hover:border-blue-300 group-hover:bg-blue-50",
+                    isDisabled &&
+                      "border-slate-200 bg-slate-100 text-slate-400"
+                  )}
+                >
+                  {isCompleted ? (
+                    <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5">
+                      <path
+                        d="M5 10.5L8.5 14L15 7.5"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  ) : (
+                    index + 1
+                  )}
+                </span>
+
+                <span
+                  className={clsx(
+                    "mt-3 text-[11px] font-bold uppercase tracking-[0.16em]",
                     isCurrent && "text-blue-600",
                     isCompleted && "text-slate-500",
                     isDisabled && "text-slate-400"
                   )}
                 >
                   Step {index + 1}
-                </div>
+                </span>
 
-                <div
+                <span
                   className={clsx(
                     "mt-1 text-sm font-semibold leading-5",
                     isCurrent && "text-slate-950",
-                    isCompleted && "text-slate-800",
+                    isCompleted && "text-slate-700",
                     isDisabled && "text-slate-400"
                   )}
                 >
                   {step.label}
-                </div>
-              </div>
-            </button>
-          );
-        })}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
-    </div>
+
+      <div className="md:hidden">
+        <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-blue-600 to-sky-500 transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+    </nav>
   );
 }
