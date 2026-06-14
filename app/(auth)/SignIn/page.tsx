@@ -6,19 +6,21 @@ import Container from "@/src/shared/ui/Container";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useSearchParams } from "next/navigation";
 
 export default function SignIn() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const dispatch = useDispatch<AppDispatch>();
 
-  const authStatus = useSelector((s: RootState) => s.auth.authStatus);
   const authError = useSelector((s: RootState) => s.auth.error);
+  const requestStatus = useSelector((s: RootState) => s.auth.requestStatus);
 
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
-  const isLoading = authStatus === "authenticated";
+  const isLoading = requestStatus === "loading";
 
   useEffect(() => {
     // keep UI in sync with redux error (optional)
@@ -48,8 +50,12 @@ export default function SignIn() {
 
     const res = await dispatch(login({ email, password }));
     if (login.fulfilled.match(res)) {
-      // nothing
-      router.push("/");
+      const nextUrl = searchParams.get("next");
+      if (nextUrl && nextUrl.startsWith("/")) {
+        router.push(nextUrl);
+      } else {
+        router.push("/");
+      }
     } else {
       // error already in redux, but you can set local too:
       setError((res.payload as string) || "Login failed.");
