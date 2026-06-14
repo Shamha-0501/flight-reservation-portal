@@ -2,10 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/src/shared/common/Navbar";
-import Providers from "@/src/app/providers";
-import { AuthBootstrapper } from "@/src/app/AuthBootstrapper";
-import TenantBootstrapper from "@/src/app/TenantBootstrapper";
-import { BootstrapGate } from "@/src/app/BootstrapGate";
+import Providers from "./providers";
+import AuthBootstrapper from "./AuthBootstrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,17 +31,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          <BootstrapGate
-            bootstrappers={
-              <>
-                <AuthBootstrapper />
-                <TenantBootstrapper />
-              </>
-            }
-          >
-            <Navbar />
-            {children}
-          </BootstrapGate>
+          <AuthBootstrapper />
+          <Navbar />
+          {children}
         </Providers>
       </body>
     </html>
