@@ -9,6 +9,7 @@ type BookingSummarySidebarProps = {
   passengers: string;
   baseFare: string;
   taxes: string;
+  addonsTotal?: string;
   total: string;
 };
 
@@ -19,6 +20,7 @@ export default function BookingSummarySidebar({
   passengers,
   baseFare,
   taxes,
+  addonsTotal = "Included",
   total,
 }: BookingSummarySidebarProps) {
   return (
@@ -51,6 +53,11 @@ export default function BookingSummarySidebar({
           <div className="flex items-center justify-between text-sm text-slate-600">
             <span>Taxes & fees</span>
             <span className="font-medium text-slate-800">{taxes}</span>
+          </div>
+
+          <div className="flex items-center justify-between text-sm text-slate-600">
+            <span>Add-ons</span>
+            <span className="font-medium text-slate-800">{addonsTotal}</span>
           </div>
         </div>
 
