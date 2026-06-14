@@ -6,6 +6,7 @@ import { ArrowRightLeft, CalendarDays, Search } from "lucide-react";
 import { useAirport } from "@/src/api/hooks/duffel/useAirport";
 import TripTypeSelector from "@/src/shared/components/home/flight-search/TripTypeSelector";
 import type { TripType } from "@/src/shared/components/home/flight-search/types";
+import PreviewDropdown from "@/src/shared/ui/PreviewDropdown";
 import {
   AirportOption,
   extractIataCode,
@@ -36,6 +37,11 @@ const CABINS: CabinOption[] = [
   { value: "BUSINESS", label: "Business" },
   { value: "FIRST", label: "First" },
 ];
+
+const CABIN_OPTIONS = CABINS.map((cabin) => ({
+  value: cabin.value,
+  label: cabin.label,
+}));
 
 function InputShell({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -205,22 +211,18 @@ function PassengersPopover({
             <div className="text-xs font-semibold text-slate-500 uppercase tracking-[0.16em]">
               Cabin class
             </div>
-            <select
+            <PreviewDropdown
               value={form.travelClass}
-              onChange={(e) =>
+              options={CABIN_OPTIONS}
+              placeholder="Select cabin"
+              onChange={(nextValue) =>
                 setForm((s) => ({
                   ...s,
-                  travelClass: e.target.value,
+                  travelClass: nextValue,
                 }))
               }
               className="mt-2 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {CABINS.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <div className="space-y-3">
