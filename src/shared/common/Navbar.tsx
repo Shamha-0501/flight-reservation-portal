@@ -8,11 +8,12 @@ import Container from "../ui/Container";
 import Link from "next/link";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/store/authSlice";
+import type { AppDispatch, RootState } from "../redux/store";
 
 export const Navbar = () => {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   
-  const status = useSelector((state: any) => state.auth.authStatus);
+  const status = useSelector((state: RootState) => state.auth.authStatus);
   const [open, setOpen] = useState(false); // mobile menu
   const [userMenuOpen, setUserMenuOpen] = useState(false); // user dropdown
 
@@ -59,7 +60,7 @@ export const Navbar = () => {
   const handleLogout = async () => {
     setUserMenuOpen(false);
     setOpen(false);
-    dispatch(logout() as any);
+    dispatch(logout());
   };
 
   return (
@@ -88,13 +89,13 @@ export const Navbar = () => {
             <ToggleTheme />
 
             {isAuthenticated ? (
-              <div className="relative" ref={userMenuRef}>
+              <div className="relative z-50" ref={userMenuRef}>
                 <button
                   type="button"
                   onClick={() => setUserMenuOpen((v) => !v)}
                   aria-haspopup="menu"
                   aria-expanded={userMenuOpen}
-                  className="inline-flex items-center justify-center rounded-md"
+                  className="inline-flex items-center justify-center rounded-full"
                 >
                   <FaCircleUser size={32} />
                 </button>
@@ -103,8 +104,17 @@ export const Navbar = () => {
                 {userMenuOpen && (
                   <div
                     role="menu"
-                    className="absolute right-0 mt-2 w-48 overflow-hidden rounded-xl border border-border bg-bg shadow-lg"
+                    className="absolute right-0 top-full z-50 mt-3 w-48 overflow-hidden rounded-xl border border-border bg-bg shadow-lg"
                   >
+                    <Link
+                      href="/bookings"
+                      role="menuitem"
+                      className="block px-4 py-3 text-sm hover:bg-muted"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      My Bookings
+                    </Link>
+
                     <Link
                       href="/profile"
                       role="menuitem"
