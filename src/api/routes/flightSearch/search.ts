@@ -20,7 +20,7 @@ function buildSearchPayload(
   params: FlightSearchParams,
   filters?: FlightSearchFilters
 ) {
-  const searchPayload: Record<string, any> = {
+  const searchPayload: Record<string, unknown> = {
     originLocationCode: params.origin,
     destinationLocationCode: params.destination,
     departureDate: params.departureDate,
@@ -49,7 +49,7 @@ function buildOffersQuery(
   offerRequestId: string,
   filters?: FlightSearchFilters
 ) {
-  const offersQuery: Record<string, any> = {
+    const offersQuery: Record<string, unknown> = {
     offer_request_id: offerRequestId,
   };
 
@@ -99,13 +99,9 @@ export const createFlightOfferRequest = async (
     }
 
     return offerRequestId;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error creating flight offer request:", error);
-    throw new Error(
-      error?.response?.data?.message ||
-        error?.response?.data?.error ||
-        "Failed to start flight search."
-    );
+    throw new Error(getApiErrorMessage(error, "Failed to start flight search."));
   }
 };
 
@@ -120,29 +116,70 @@ export const fetchFlightOffers = async (
     });
 
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching flight offers:", error);
-    throw new Error(
-      error?.response?.data?.message ||
-        error?.response?.data?.error ||
-        "Failed to fetch flight offers."
-    );
+    throw new Error(getApiErrorMessage(error, "Failed to fetch flight offers."));
   }
 };
 
-export const getFlightOffer = async (offerId: string): Promise<any> => {
+export type FlightOfferDetails = {
+  offer: Record<string, unknown>;
+  seatMapStatus?: "available" | "view_only" | "unavailable" | string;
+};
+
+function unwrapOfferDetails(payload: unknown): FlightOfferDetails {
+  const response = asRecord(payload) ?? {};
+  const wrappedOffer = asRecord(response.offer);
+  const rawOffer =
+    (wrappedOffer ? asRecord(wrappedOffer.data) ?? wrappedOffer : null) ??
+    asRecord(response.data) ??
+    response;
+
+  return {
+    offer: rawOffer,
+    seatMapStatus:
+      typeof response.seat_map_status === "string"
+        ? response.seat_map_status
+        : undefined,
+  };
+}
+
+export const getFlightOfferDetails = async (
+  offerId: string
+): Promise<FlightOfferDetails> => {
   try {
     const response = await http.get(`/api/offers/${offerId}`);
-    return response.data?.data ?? response.data;
-  } catch (error: any) {
+    return unwrapOfferDetails(response.data);
+  } catch (error: unknown) {
     console.error("Error fetching flight offer:", error);
-    throw new Error(
-      error?.response?.data?.message ||
-        error?.response?.data?.error ||
-        "Failed to fetch selected flight."
-    );
+    throw new Error(getApiErrorMessage(error, "Failed to fetch selected flight."));
   }
 };
+
+export const getFlightOffer = async (
+  offerId: string
+): Promise<Record<string, unknown>> => {
+  const details = await getFlightOfferDetails(offerId);
+  return details.offer;
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function getApiErrorMessage(error: unknown, fallback: string) {
+  const responseError = error as {
+    response?: { data?: { message?: string; error?: string } };
+  };
+
+  return (
+    responseError.response?.data?.message ||
+    responseError.response?.data?.error ||
+    (error instanceof Error ? error.message : fallback)
+  );
+}
 
 export const searchFlights = async (
   request: FlightSearchRequest
