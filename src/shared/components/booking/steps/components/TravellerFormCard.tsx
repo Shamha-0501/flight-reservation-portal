@@ -1,16 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import clsx from "clsx";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { Baby, UserRound, UsersRound } from "lucide-react";
-import Select, {
-  type SingleValue,
-  type StylesConfig,
-} from "react-select";
-import countryList from "react-select-country-list";
 import type { TravellerFormValue } from "../TravellerInfoStep";
+import PreviewDropdown from "@/src/shared/ui/PreviewDropdown";
 
 type Traveller = {
   id: string;
@@ -22,17 +18,12 @@ type Traveller = {
 type TravellerFormCardProps = {
   traveller: Traveller;
   value: TravellerFormValue;
+  errors?: Partial<Record<keyof TravellerFormValue, string>>;
+  showErrors?: boolean;
   isOpen: boolean;
   onToggle: () => void;
   onChange: (field: keyof TravellerFormValue, value: string) => void;
 };
-
-type CountryOption = {
-  value: string;
-  label: string;
-};
-
-const countryOptions = countryList().getData() as CountryOption[];
 
 const travellerIconMap = {
   ADULT: UserRound,
@@ -40,79 +31,40 @@ const travellerIconMap = {
   INFANT: Baby,
 } as const;
 
+const TITLE_OPTIONS = [
+  { value: "mr", label: "Mr." },
+  { value: "mrs", label: "Mrs." },
+  { value: "ms", label: "Ms." },
+  { value: "miss", label: "Miss." },
+  { value: "mx", label: "Mx." },
+];
+
+const GENDER_OPTIONS = [
+  { value: "m", label: "Male" },
+  { value: "f", label: "Female" },
+];
+
 export default function TravellerFormCard({
   traveller,
   value,
+  errors = {},
+  showErrors = false,
   isOpen,
   onToggle,
   onChange,
 }: TravellerFormCardProps) {
   const TravellerIcon = travellerIconMap[traveller.type];
-  const menuPortalTarget =
-    typeof document !== "undefined" ? document.body : null;
   const dateOfBirth = value.born_on ? new Date(value.born_on) : null;
-  const passportExpiry = value.passport_expiry ? new Date(value.passport_expiry) : null;
-  const nationality =
-    countryOptions.find((option) => option.value === value.nationality) ?? null;
-  const issuingCountry =
-    countryOptions.find((option) => option.value === value.issuing_country) ?? null;
 
   const inputClass =
     "h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
   const labelClass = "mb-1.5 block text-sm font-medium text-slate-800";
   const sectionTitleClass =
     "text-[13px] font-semibold uppercase tracking-[0.16em] text-slate-700";
-  const selectStyles: StylesConfig<CountryOption, false> = {
-    control: (base, state) => ({
-      ...base,
-      width: "100%",
-      minHeight: "44px",
-      borderRadius: "0.75rem",
-      borderColor: state.isFocused ? "#3b82f6" : "#cbd5e1",
-      boxShadow: state.isFocused ? "0 0 0 4px rgba(219, 234, 254, 1)" : "none",
-      "&:hover": {
-        borderColor: state.isFocused ? "#3b82f6" : "#cbd5e1",
-      },
-    }),
-    container: (base) => ({
-      ...base,
-      width: "100%",
-    }),
-    valueContainer: (base) => ({
-      ...base,
-      padding: "0 0.75rem",
-    }),
-    input: (base) => ({
-      ...base,
-      margin: "0",
-      padding: "0",
-    }),
-    placeholder: (base) => ({
-      ...base,
-      color: "#94a3b8",
-    }),
-    singleValue: (base) => ({
-      ...base,
-      color: "#0f172a",
-    }),
-    indicatorSeparator: () => ({
-      display: "none",
-    }),
-    dropdownIndicator: (base) => ({
-      ...base,
-      color: "#64748b",
-    }),
-    menu: (base) => ({
-      ...base,
-      borderRadius: "1rem",
-      overflow: "hidden",
-      zIndex: 9999,
-    }),
-    menuPortal: (base) => ({
-      ...base,
-      zIndex: 9999,
-    }),
-  };
+  const inputErrorClass = "border-rose-300 focus:border-rose-500 focus:ring-rose-100";
+
+  const withErrorClass = (field: keyof TravellerFormValue) =>
+    clsx(inputClass, showErrors && errors[field] && inputErrorClass);
 
   return (
     <section
@@ -182,67 +134,67 @@ export default function TravellerFormCard({
 
               <div className="mt-3 grid gap-4 md:grid-cols-3">
                 <div>
-                  <label className={labelClass}>Title</label>
-                  <select
-                    className={inputClass}
+                  <label className={labelClass}>Title <span className="text-rose-500">*</span></label>
+                  <PreviewDropdown
                     value={value.title}
-                    onChange={(event) => onChange("title", event.target.value)}
-                  >
-                    <option value="" disabled>
-                      Select title
-                    </option>
-                    <option value="mr">Mr</option>
-                    <option value="mrs">Mrs</option>
-                    <option value="ms">Ms</option>
-                    <option value="miss">Miss</option>
-                    <option value="mx">Mx</option>
-                  </select>
+                    options={TITLE_OPTIONS}
+                    placeholder="Select title"
+                    className={withErrorClass("title")}
+                    onChange={(nextValue) => onChange("title", nextValue)}
+                  />
+                  {showErrors && errors.title ? (
+                    <p className="mt-1.5 text-xs font-medium text-rose-600">{errors.title}</p>
+                  ) : null}
                 </div>
 
                 <div>
-                  <label className={labelClass}>First Name</label>
+                  <label className={labelClass}>First Name <span className="text-rose-500">*</span></label>
                   <input
-                    className={inputClass}
+                    className={withErrorClass("given_name")}
                     placeholder="John"
                     value={value.given_name}
                     onChange={(event) =>
                       onChange("given_name", event.target.value)
                     }
                   />
+                  {showErrors && errors.given_name ? (
+                    <p className="mt-1.5 text-xs font-medium text-rose-600">{errors.given_name}</p>
+                  ) : null}
                 </div>
 
                 <div>
-                  <label className={labelClass}>Last Name</label>
+                  <label className={labelClass}>Last Name <span className="text-rose-500">*</span></label>
                   <input
-                    className={inputClass}
+                    className={withErrorClass("family_name")}
                     placeholder="Doe"
                     value={value.family_name}
                     onChange={(event) =>
                       onChange("family_name", event.target.value)
                     }
                   />
+                  {showErrors && errors.family_name ? (
+                    <p className="mt-1.5 text-xs font-medium text-rose-600">{errors.family_name}</p>
+                  ) : null}
                 </div>
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className={labelClass}>Gender</label>
-                  <select
-                    className={inputClass}
+                  <label className={labelClass}>Gender <span className="text-rose-500">*</span></label>
+                  <PreviewDropdown
                     value={value.gender}
-                    onChange={(event) => onChange("gender", event.target.value)}
-                  >
-                    <option value="" disabled>
-                      Select gender
-                    </option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                  </select>
+                    options={GENDER_OPTIONS}
+                    placeholder="Select gender"
+                    className={withErrorClass("gender")}
+                    onChange={(nextValue) => onChange("gender", nextValue)}
+                  />
+                  {showErrors && errors.gender ? (
+                    <p className="mt-1.5 text-xs font-medium text-rose-600">{errors.gender}</p>
+                  ) : null}
                 </div>
 
                 <div>
-                  <label className={labelClass}>Date of Birth</label>
+                  <label className={labelClass}>Date of Birth <span className="text-rose-500">*</span></label>
                   <DatePicker
                     selected={dateOfBirth}
                     onChange={(date: Date | null) =>
@@ -254,85 +206,22 @@ export default function TravellerFormCard({
                     showMonthDropdown
                     showYearDropdown
                     dropdownMode="select"
-                    className={inputClass}
+                    className={withErrorClass("born_on")}
                     wrapperClassName="block w-full"
                     popperClassName="z-[9999]"
                   />
+                  {showErrors && errors.born_on ? (
+                    <p className="mt-1.5 text-xs font-medium text-rose-600">{errors.born_on}</p>
+                  ) : null}
                 </div>
               </div>
             </div>
 
-            <div className="border-t border-slate-200 pt-6">
-              <div className={sectionTitleClass}>Travel document</div>
-
-              <div className="mt-3 grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className={labelClass}>Nationality</label>
-                  <Select
-                    options={countryOptions}
-                    value={nationality}
-                    onChange={(option: SingleValue<CountryOption>) =>
-                      onChange("nationality", option?.value ?? "")
-                    }
-                    placeholder="Select nationality"
-                    isSearchable
-                    styles={selectStyles}
-                    menuPortalTarget={menuPortalTarget}
-                    menuPosition="fixed"
-                  />
-                </div>
-
-                <div>
-                  <label className={labelClass}>Passport Number</label>
-                  <input
-                    className={inputClass}
-                    placeholder="N1234567"
-                    value={value.passport_number}
-                    onChange={(event) =>
-                      onChange("passport_number", event.target.value)
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className={labelClass}>Passport Expiry</label>
-                  <DatePicker
-                    selected={passportExpiry}
-                    onChange={(date: Date | null) =>
-                      onChange(
-                        "passport_expiry",
-                        date ? date.toISOString().slice(0, 10) : ""
-                      )
-                    }
-                    dateFormat="dd/MM/yyyy"
-                    placeholderText="Select passport expiry"
-                    minDate={new Date()}
-                    showMonthDropdown
-                    showYearDropdown
-                    dropdownMode="select"
-                    className={inputClass}
-                    wrapperClassName="block w-full"
-                    popperClassName="z-[9999]"
-                  />
-                </div>
-
-                <div>
-                  <label className={labelClass}>Issuing Country</label>
-                  <Select
-                    options={countryOptions}
-                    value={issuingCountry}
-                    onChange={(option: SingleValue<CountryOption>) =>
-                      onChange("issuing_country", option?.value ?? "")
-                    }
-                    placeholder="Select issuing country"
-                    isSearchable
-                    styles={selectStyles}
-                    menuPortalTarget={menuPortalTarget}
-                    menuPosition="fixed"
-                  />
-                </div>
-              </div>
-            </div>
+            {/*
+              Travel document fields are intentionally hidden for now because
+              the backend create-order payload does not accept them yet:
+              nationality, passport_number, passport_expiry, issuing_country.
+            */}
 
             <div className="border-t border-slate-200 pt-6">
               <div className={sectionTitleClass}>Frequent flyer</div>
@@ -341,25 +230,31 @@ export default function TravellerFormCard({
                 <div>
                   <label className={labelClass}>Frequent Flyer Airline</label>
                   <input
-                    className={inputClass}
+                    className={withErrorClass("loyalty_programme_airline")}
                     placeholder="AI"
                     value={value.loyalty_programme_airline}
                     onChange={(event) =>
                       onChange("loyalty_programme_airline", event.target.value)
                     }
                   />
+                  {showErrors && errors.loyalty_programme_airline ? (
+                    <p className="mt-1.5 text-xs font-medium text-rose-600">{errors.loyalty_programme_airline}</p>
+                  ) : null}
                 </div>
 
                 <div>
                   <label className={labelClass}>Frequent Flyer Number</label>
                   <input
-                    className={inputClass}
+                    className={withErrorClass("loyalty_programme_number")}
                     placeholder="Membership number"
                     value={value.loyalty_programme_number}
                     onChange={(event) =>
                       onChange("loyalty_programme_number", event.target.value)
                     }
                   />
+                  {showErrors && errors.loyalty_programme_number ? (
+                    <p className="mt-1.5 text-xs font-medium text-rose-600">{errors.loyalty_programme_number}</p>
+                  ) : null}
                 </div>
               </div>
             </div>
