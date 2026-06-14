@@ -7,84 +7,94 @@ type AddonCardProps = {
   title: string;
   description: string;
   price: string;
-  icon?: React.ReactNode;
-  selected?: boolean;
+  tag?: string;
+  selected: boolean;
+  onToggle: () => void;
 };
 
 export default function AddonCard({
   title,
   description,
   price,
-  icon,
-  selected = false,
+  tag,
+  selected,
+  onToggle,
 }: AddonCardProps) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onToggle}
       className={clsx(
-        "rounded-3xl border p-4 transition",
+        "group w-full rounded-3xl border p-4 text-left transition",
         selected
-          ? "border-blue-200 bg-blue-50/60"
-          : "border-slate-200 bg-white"
+          ? "border-blue-300 bg-blue-50 shadow-[0_10px_24px_rgba(37,99,235,0.08)]"
+          : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
       )}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-4">
           <div
             className={clsx(
-              "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-slate-700",
-              selected ? "bg-blue-100 text-blue-700" : "bg-slate-100"
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition",
+              selected
+                ? "bg-blue-600 text-white"
+                : "bg-blue-50 text-blue-600"
             )}
           >
-            {icon ?? (
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                className="h-5 w-5"
-                aria-hidden="true"
-              >
-                <path
-                  d="M12 3L14.8 8.2L20.5 9L16.3 13L17.3 18.7L12 16L6.7 18.7L7.7 13L3.5 9L9.2 8.2L12 3Z"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            )}
+            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+              <path
+                d="M12 3L19 6V11C19 15.5 16.2 19.6 12 21C7.8 19.6 5 15.5 5 11V6L12 3Z"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M9 12L11 14L15.5 9.5"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </div>
 
           <div className="min-w-0">
-            <div className="text-base font-semibold tracking-tight text-slate-950">
-              {title}
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="text-base font-semibold text-slate-950">
+                {title}
+              </h4>
+
+              {tag && (
+                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                  {tag}
+                </span>
+              )}
             </div>
-            <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-600">
+
+            <p className="mt-1 text-sm leading-5 text-slate-600">
               {description}
             </p>
           </div>
         </div>
 
-        <div className="shrink-0 text-right">
-          <div
-            className={clsx(
-              "text-base font-semibold text-slate-950",
-              selected && "text-blue-700"
-            )}
-          >
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <div className="rounded-full bg-white px-3 py-1 text-sm font-bold text-slate-950 shadow-sm ring-1 ring-slate-200">
             {price}
           </div>
-          <button
-            type="button"
+
+          <span
             className={clsx(
-              "mt-3 inline-flex h-9 items-center justify-center rounded-xl px-4 text-sm font-semibold transition",
+              "inline-flex h-9 items-center justify-center rounded-full px-4 text-xs font-bold transition",
               selected
-                ? "bg-blue-600 text-white hover:bg-blue-700"
-                : "border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+                ? "bg-blue-600 text-white"
+                : "border border-slate-300 bg-white text-slate-700 group-hover:border-blue-300 group-hover:text-blue-700"
             )}
           >
-            {selected ? "Selected" : "Add"}
-          </button>
+            {selected ? "Added" : "Add"}
+          </span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
