@@ -11,9 +11,11 @@ import {
 } from "@/src/api/routes/orders/bookings";
 import {
   confirmOrderCancellation,
+  confirmOrderRefund,
   createOrderCancellation,
   getOrderCancellation,
   getOrderRefundableStatus,
+  type OrderCancellationResponse,
   type OrderRefundableStatusResponse,
 } from "@/src/api/routes/orders/cancellation";
 
@@ -88,34 +90,86 @@ function getRefundBeforeDeparture(
 }
 
 function normalizeStatusDetails(value?: string | null) {
-  return (value ?? "unknown").toLowerCase().trim();
+  return (value ?? "").toLowerCase().trim();
 }
 
-function detailStatusLabel(value?: string | null) {
-  const status = normalizeStatusDetails(value);
-  if (status === "created") return "Booked";
-  if (status === "cancelled" || status === "canceled") return "Cancelled";
-  if (status === "refunded") return "Refunded";
-  if (status === "pending") return "Pending";
-  return status.charAt(0).toUpperCase() + status.slice(1);
+function getBookingDisplayState(order?: BookingListItem | null) {
+  const cancellationStatus = normalizeStatusDetails(order?.cancellation_status);
+  const refundStatus = normalizeStatusDetails(order?.refund_status);
+  const status = normalizeStatusDetails(order?.status);
+
+  if (refundStatus === "refunded" || status === "refunded") {
+    return { key: "refunded", label: "Refunded" };
+  }
+
+  if (cancellationStatus === "cancelled") {
+    if (refundStatus === "refund pending") {
+      return { key: "refund-pending", label: "Cancelled · Refund Pending" };
+    }
+
+    if (refundStatus === "refund unknown") {
+      return { key: "refund-unknown", label: "Cancelled · Refund Unknown" };
+    }
+
+    if (refundStatus === "no refund") {
+      return { key: "cancelled-no-refund", label: "Cancelled · No Refund" };
+    }
+
+    return { key: "cancelled", label: "Cancelled" };
+  }
+
+  if (
+    cancellationStatus === "cancellation requested" ||
+    status === "cancellation requested"
+  ) {
+    return { key: "cancellation-requested", label: "Cancellation Requested" };
+  }
+
+  if (status === "created" || status === "booked" || status === "confirmed") {
+    return { key: "booked", label: "Booked" };
+  }
+
+  if (status === "pending") {
+    return { key: "pending", label: "Pending" };
+  }
+
+  return {
+    key: status || "unknown",
+    label: order?.status || "Unknown",
+  };
 }
 
-function DetailStatusChip({ status }: { status?: string | null }) {
-  const normalized = normalizeStatusDetails(status);
+function DetailStatusChip({
+  status,
+  cancellationStatus,
+  refundStatus,
+}: {
+  status?: string | null;
+  cancellationStatus?: string | null;
+  refundStatus?: string | null;
+}) {
+  const display = getBookingDisplayState({
+    status,
+    cancellation_status: cancellationStatus,
+    refund_status: refundStatus,
+  } as BookingListItem);
   const styles =
-    normalized === "created" || normalized === "booked" || normalized === "confirmed"
+    display.key === "booked"
       ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-      : normalized === "cancelled" || normalized === "canceled"
+      : display.key === "cancelled" ||
+          display.key === "cancelled-no-refund" ||
+          display.key === "refund-pending" ||
+          display.key === "refund-unknown"
         ? "border-rose-200 bg-rose-50 text-rose-700"
-        : normalized === "refunded"
+        : display.key === "refunded"
           ? "border-sky-200 bg-sky-50 text-sky-700"
-          : normalized === "pending"
+          : display.key === "pending" || display.key === "cancellation-requested"
             ? "border-amber-200 bg-amber-50 text-amber-700"
             : "border-slate-200 bg-slate-50 text-slate-700";
 
   return (
     <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ${styles}`}>
-      {detailStatusLabel(status)}
+      {display.label}
     </span>
   );
 }
@@ -153,13 +207,33 @@ function SectionCard({
   );
 }
 
-function BookingTimeline({ status }: { status?: string | null }) {
+function BookingTimeline({
+  status,
+  cancellationStatus,
+  refundStatus,
+}: {
+  status?: string | null;
+  cancellationStatus?: string | null;
+  refundStatus?: string | null;
+}) {
   const normalized = normalizeStatusDetails(status);
+  const normalizedCancellation = normalizeStatusDetails(cancellationStatus);
+  const normalizedRefund = normalizeStatusDetails(refundStatus);
   const steps = [
     { label: "Booking created", active: true },
     { label: "Payment recorded", active: normalized !== "pending" },
-    { label: "Ticket status updated", active: normalized === "created" || normalized === "booked" || normalized === "confirmed" },
-    { label: "Cancelled", active: normalized === "cancelled" || normalized === "canceled" },
+    {
+      label: "Cancellation requested",
+      active: normalizedCancellation === "cancellation requested",
+    },
+    {
+      label: "Cancelled",
+      active: normalizedCancellation === "cancelled" || normalized === "cancelled",
+    },
+    {
+      label: "Refund completed",
+      active: normalizedRefund === "refunded" || normalized === "refunded",
+    },
   ];
 
   return (
@@ -219,8 +293,11 @@ export default function BookingDetailsPage() {
   const [confirmingCancellation, setConfirmingCancellation] = useState(false);
   const [cancellationError, setCancellationError] = useState<string | null>(null);
   const [cancellationPayload, setCancellationPayload] = useState<Record<string, unknown> | null>(null);
+  const [cancellationQuote, setCancellationQuote] =
+    useState<OrderCancellationResponse["quote"] | null>(null);
   const [cancellationId, setCancellationId] = useState<string | null>(null);
   const [cancellationSuccess, setCancellationSuccess] = useState<string | null>(null);
+  const [confirmingRefund, setConfirmingRefund] = useState(false);
   const [refundabilityStatus, setRefundabilityStatus] =
     useState<OrderRefundableStatusResponse | null>(null);
 
@@ -277,8 +354,17 @@ export default function BookingDetailsPage() {
     };
   }, [bookingId, tenantKey]);
 
-  const orderStatus = normalizeStatusDetails(order?.status);
-  const isCancelled = orderStatus === "cancelled" || orderStatus === "canceled";
+  const orderDisplayState = getBookingDisplayState(order);
+  const isCancelled =
+    normalizeStatusDetails(order?.cancellation_status) === "cancelled" ||
+    orderDisplayState.key === "cancelled" ||
+    orderDisplayState.key === "cancelled-no-refund" ||
+    orderDisplayState.key === "refund-pending" ||
+    orderDisplayState.key === "refund-unknown" ||
+    orderDisplayState.key === "refunded";
+  const canConfirmRefund =
+    normalizeStatusDetails(order?.cancellation_status) === "cancelled" &&
+    normalizeStatusDetails(order?.refund_status) === "refund pending";
 
   const totalAmount = formatMoneyDetails(order?.amounts?.total?.amount, order?.amounts?.total?.currency);
   const refundBeforeDeparture = getRefundBeforeDeparture(refundabilityStatus);
@@ -293,6 +379,7 @@ export default function BookingDetailsPage() {
     setCancellationError(null);
     setCancellationSuccess(null);
     setCancellationPayload(null);
+    setCancellationQuote(null);
     setCancellationId(null);
     setRefundabilityStatus(null);
   };
@@ -350,11 +437,12 @@ export default function BookingDetailsPage() {
       const id =
         typeof responseData?.id === "string"
           ? responseData.id
-          : typeof (response as Record<string, unknown>)?.id === "string"
-            ? ((response as Record<string, unknown>).id as string)
+          : typeof response.quote?.cancellation_id === "string"
+            ? response.quote.cancellation_id
             : null;
 
       setCancellationPayload(responseData);
+      setCancellationQuote(response.quote ?? null);
       setCancellationId(id);
       setCancellationStep("review");
     } catch (quoteError: unknown) {
@@ -389,6 +477,7 @@ export default function BookingDetailsPage() {
       const latest = await getOrderCancellation(cancellationId);
       const latestData = (latest?.data ?? latest) as Record<string, unknown>;
       setCancellationPayload(latestData);
+      setCancellationQuote(latest.quote ?? null);
       setCancellationSuccess("Cancellation confirmed successfully.");
       if (bookingId && tenantKey) {
         await loadBookingDetails(bookingId, tenantKey);
@@ -401,6 +490,26 @@ export default function BookingDetailsPage() {
       );
     } finally {
       setConfirmingCancellation(false);
+    }
+  };
+
+  const runConfirmRefund = async () => {
+    if (!order?.id) return;
+
+    setConfirmingRefund(true);
+    try {
+      await confirmOrderRefund({ orderId: order.id });
+      if (bookingId && tenantKey) {
+        await loadBookingDetails(bookingId, tenantKey);
+      }
+    } catch (confirmError: unknown) {
+      setCancellationError(
+        confirmError instanceof Error
+          ? confirmError.message
+          : "Failed to confirm refund."
+      );
+    } finally {
+      setConfirmingRefund(false);
     }
   };
 
@@ -459,8 +568,22 @@ export default function BookingDetailsPage() {
                 <InfoCardDetails label="Duffel Order ID" value={order.duffel_order_id || "-"} />
                 <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                   <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Status</div>
-                  <div className="mt-2"><DetailStatusChip status={order.status} /></div>
+                  <div className="mt-2">
+                    <DetailStatusChip
+                      status={order.status}
+                      cancellationStatus={order.cancellation_status}
+                      refundStatus={order.refund_status}
+                    />
+                  </div>
                 </div>
+                <InfoCardDetails
+                  label="Cancellation"
+                  value={order.cancellation_status || "-"}
+                />
+                <InfoCardDetails
+                  label="Refund"
+                  value={order.refund_status || "-"}
+                />
                 <InfoCardDetails label="Total" value={totalAmount} />
               </section>
 
@@ -530,6 +653,29 @@ export default function BookingDetailsPage() {
                       This booking has already been cancelled.
                     </div>
                   ) : null}
+
+                  {canConfirmRefund ? (
+                    <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div className="text-sm font-bold text-sky-900">
+                            Refund pending
+                          </div>
+                          <p className="mt-1 text-sm leading-6 text-sky-800">
+                            The booking is cancelled and the refund is waiting for confirmation in the local system.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={runConfirmRefund}
+                          disabled={confirmingRefund}
+                          className="inline-flex h-10 items-center justify-center rounded-xl bg-sky-600 px-4 text-sm font-bold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {confirmingRefund ? "Confirming..." : "Mark refund confirmed"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </SectionCard>
             </div>
@@ -542,7 +688,19 @@ export default function BookingDetailsPage() {
                 <div className="mt-4 space-y-3">
                   <div className="flex items-center justify-between gap-4 text-sm">
                     <span className="text-slate-500">Status</span>
-                    <DetailStatusChip status={order.status} />
+                    <DetailStatusChip
+                      status={order.status}
+                      cancellationStatus={order.cancellation_status}
+                      refundStatus={order.refund_status}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-4 text-sm">
+                    <span className="text-slate-500">Cancellation</span>
+                    <span className="font-bold text-slate-950">{order.cancellation_status || "-"}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 text-sm">
+                    <span className="text-slate-500">Refund</span>
+                    <span className="font-bold text-slate-950">{order.refund_status || "-"}</span>
                   </div>
                   <div className="flex items-center justify-between gap-4 text-sm">
                     <span className="text-slate-500">Reference</span>
@@ -565,7 +723,11 @@ export default function BookingDetailsPage() {
                 <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">Progress</div>
                 <h2 className="mt-1 text-lg font-extrabold text-slate-950">Booking timeline</h2>
                 <div className="mt-4">
-                  <BookingTimeline status={order.status} />
+                  <BookingTimeline
+                    status={order.status}
+                    cancellationStatus={order.cancellation_status}
+                    refundStatus={order.refund_status}
+                  />
                 </div>
               </section>
 
@@ -686,9 +848,54 @@ export default function BookingDetailsPage() {
                       </div>
                     </div>
 
-                    <pre className="max-h-56 overflow-auto whitespace-pre-wrap text-xs text-slate-700">
-                      {JSON.stringify(cancellationPayload, null, 2)}
-                    </pre>
+                    {cancellationQuote ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <InfoCardDetails
+                          label="Refund amount"
+                          value={formatMoneyDetails(
+                            cancellationQuote.refund_amount,
+                            cancellationQuote.refund_currency
+                          )}
+                        />
+                        <InfoCardDetails
+                          label="Cancellation fee"
+                          value={formatMoneyDetails(
+                            cancellationQuote.cancellation_fee,
+                            cancellationQuote.cancellation_fee_currency
+                          )}
+                        />
+                        <InfoCardDetails
+                          label="Quote expires"
+                          value={formatDateDetails(cancellationQuote.expires_at)}
+                        />
+                        <InfoCardDetails
+                          label="Quote ID"
+                          value={cancellationQuote.cancellation_id || "-"}
+                        />
+                      </div>
+                    ) : null}
+
+                    {(cancellationQuote?.warnings ?? []).length ? (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                        <div className="text-sm font-bold text-amber-900">
+                          Cancellation warnings
+                        </div>
+                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800">
+                          {(cancellationQuote?.warnings ?? []).map((warning) => (
+                            <li key={warning}>{warning}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    <details className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700">
+                      <summary className="cursor-pointer font-bold text-slate-900">
+                        Raw cancellation payload
+                      </summary>
+                      <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap text-xs text-slate-700">
+                        {JSON.stringify(cancellationPayload, null, 2)}
+                      </pre>
+                    </details>
                   </div>
                 </div>
               ) : null}

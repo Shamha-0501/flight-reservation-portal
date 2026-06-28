@@ -6,6 +6,8 @@ export type BookingListItem = {
   duffel_order_id?: string | null;
   booking_reference?: string | null;
   status?: string | null;
+  cancellation_status?: string | null;
+  refund_status?: string | null;
   void_window_ends_at?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -34,6 +36,22 @@ export type BookingListItem = {
   meta?: {
     offer?: Record<string, unknown> | null;
     duffel_order?: Record<string, unknown> | null;
+    cancellation?: {
+      cancellation_id?: string | null;
+      refund_amount?: string | number | null;
+      refund_currency?: string | null;
+      cancellation_fee?: string | number | null;
+      cancellation_fee_currency?: string | null;
+      expires_at?: string | null;
+      confirmed_at?: string | null;
+      refund_confirmed_at?: string | null;
+      warnings?: string[] | null;
+      refund_confirmation?: {
+        reference?: string | null;
+        notes?: string | null;
+      } | null;
+      cancellation_response?: Record<string, unknown> | null;
+    } | null;
   };
 };
 
@@ -52,6 +70,8 @@ export async function fetchBookings(params: {
   tenantKey: string;
   email?: string;
   status?: string;
+  cancellation_status?: string;
+  refund_status?: string;
   page?: number;
 }): Promise<BookingListResponse> {
   try {

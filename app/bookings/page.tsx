@@ -50,34 +50,71 @@ function formatDate(value?: string | null): string {
 }
 
 function normalizeStatus(value?: string | null) {
-  return (value ?? "unknown").toLowerCase().trim();
+  return (value ?? "").toLowerCase().trim();
 }
 
-function statusLabel(value?: string | null) {
-  const status = normalizeStatus(value);
-  if (status === "created") return "Booked";
-  if (status === "cancelled" || status === "canceled") return "Cancelled";
-  if (status === "refunded") return "Refunded";
-  if (status === "pending") return "Pending";
-  return status.charAt(0).toUpperCase() + status.slice(1);
+function getBookingDisplayState(item: BookingListItem) {
+  const cancellationStatus = normalizeStatus(item.cancellation_status);
+  const refundStatus = normalizeStatus(item.refund_status);
+  const status = normalizeStatus(item.status);
+
+  if (refundStatus === "refunded" || status === "refunded") {
+    return { key: "refunded", label: "Refunded" };
+  }
+
+  if (cancellationStatus === "cancelled") {
+    if (refundStatus === "refund pending") {
+      return { key: "refund-pending", label: "Cancelled · Refund Pending" };
+    }
+
+    if (refundStatus === "refund unknown") {
+      return { key: "refund-unknown", label: "Cancelled · Refund Unknown" };
+    }
+
+    if (refundStatus === "no refund") {
+      return { key: "cancelled-no-refund", label: "Cancelled · No Refund" };
+    }
+
+    return { key: "cancelled", label: "Cancelled" };
+  }
+
+  if (cancellationStatus === "cancellation requested" || status === "cancellation requested") {
+    return { key: "cancellation-requested", label: "Cancellation Requested" };
+  }
+
+  if (status === "created" || status === "booked" || status === "confirmed") {
+    return { key: "booked", label: "Booked" };
+  }
+
+  if (status === "pending") {
+    return { key: "pending", label: "Pending" };
+  }
+
+  return {
+    key: status || "unknown",
+    label: item.status || "Unknown",
+  };
 }
 
-function StatusChip({ status }: { status?: string | null }) {
-  const normalized = normalizeStatus(status);
+function StatusChip({ item }: { item: BookingListItem }) {
+  const display = getBookingDisplayState(item);
   const styles =
-    normalized === "created" || normalized === "booked" || normalized === "confirmed"
+    display.key === "booked"
       ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-      : normalized === "cancelled" || normalized === "canceled"
+      : display.key === "cancelled" ||
+          display.key === "cancelled-no-refund" ||
+          display.key === "refund-pending" ||
+          display.key === "refund-unknown"
         ? "border-rose-200 bg-rose-50 text-rose-700"
-        : normalized === "refunded"
+        : display.key === "refunded"
           ? "border-sky-200 bg-sky-50 text-sky-700"
-          : normalized === "pending"
+          : display.key === "pending" || display.key === "cancellation-requested"
             ? "border-amber-200 bg-amber-50 text-amber-700"
             : "border-slate-200 bg-slate-50 text-slate-700";
 
   return (
     <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ${styles}`}>
-      {statusLabel(status)}
+      {display.label}
     </span>
   );
 }
@@ -91,7 +128,7 @@ function BookingCard({ item }: { item: BookingListItem }) {
       <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <StatusChip status={item.status} />
+            <StatusChip item={item} />
             <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
               Reservation
             </span>
@@ -248,7 +285,7 @@ export default function BookingsPage() {
         String(item.id).toLowerCase().includes(query);
 
       const matchesStatus =
-        statusFilter === "all" || normalizeStatus(item.status) === statusFilter;
+        statusFilter === "all" || getBookingDisplayState(item).key === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
@@ -312,9 +349,13 @@ export default function BookingsPage() {
                 className="h-11 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
               >
                 <option value="all">All statuses</option>
-                <option value="created">Booked</option>
+                <option value="booked">Booked</option>
+                <option value="cancellation-requested">Cancellation Requested</option>
                 <option value="pending">Pending</option>
                 <option value="cancelled">Cancelled</option>
+                <option value="refund-pending">Cancelled · Refund Pending</option>
+                <option value="cancelled-no-refund">Cancelled · No Refund</option>
+                <option value="refund-unknown">Cancelled · Refund Unknown</option>
                 <option value="refunded">Refunded</option>
               </select>
             </div>
