@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import Container from "@/src/shared/ui/Container"; // adjust path
+import Container from "@/src/shared/ui/Container";
 import { BadgeCheck, Headphones, BarChart3, ArrowRight } from "lucide-react";
-import Image from "next/image";
+import Link from "next/link";
 
 export default function AgentSection() {
   const points = [
@@ -47,8 +47,8 @@ export default function AgentSection() {
               </p>
 
               <div className="mt-6 flex flex-wrap gap-4">
-                <a
-                  href="/agents/register"
+                <Link
+                  href="/agency/register"
                   className="
                     inline-flex items-center gap-2
                     rounded-xl bg-primary-500 px-5 py-3
@@ -58,10 +58,10 @@ export default function AgentSection() {
                 >
                   Register as an Agent
                   <ArrowRight className="h-4 w-4" />
-                </a>
+                </Link>
 
-                <a
-                  href="/agents"
+                <Link
+                  href="/agency"
                   className="
                     inline-flex items-center gap-2
                     rounded-xl bg-white/10 px-5 py-3
@@ -70,7 +70,7 @@ export default function AgentSection() {
                   "
                 >
                   Learn More
-                </a>
+                </Link>
               </div>
             </div>
 
