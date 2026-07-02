@@ -1,10 +1,5 @@
-import Container from '@/src/shared/ui/Container'
-import React from 'react'
+import { redirect } from "next/navigation";
 
-export default function page() {
-  return (
-    <Container>
-        Test
-    </Container>
-  )
+export default function LegacySignUpPage() {
+  redirect("/register");
 }
