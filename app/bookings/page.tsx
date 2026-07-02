@@ -233,7 +233,9 @@ export default function BookingsPage() {
 
   useEffect(() => {
     if (!tenantKey) {
-      setError("Tenant key is missing. Unable to load bookings.");
+      setError(
+        "No tenant workspace is linked to this account yet. Booking history will appear here once a tenant context is available.",
+      );
       setItems([]);
       return;
     }

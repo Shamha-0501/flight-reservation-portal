@@ -1,46 +1,39 @@
 import { csrf, http } from "@/src/api/config/http";
+import type { AuthTenant, AuthUser } from "@/src/shared/auth/authModel";
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 
-type Tenant = {
-  id: number;
-  key: string;
-  name: string;
-  role: string;
-  status: string;
-  joined_at: string;
-};
+type ApiErrors = Record<string, string[]>;
 
-type User = {
-  id?: number;
-  name: string;
-  email: string;
-  tenants: Tenant[];
-  tenant_key?: string;
-};
-
-type LoginResponse = {
+type AuthResponse = {
   ok: boolean;
-  user: User;
-  errors?: Record<string, string[]>;
+  user: AuthUser;
+  tenant?: AuthTenant;
+  errors?: ApiErrors;
   message?: string;
 };
 
 type MeResponse = {
   ok: boolean;
-  user: User;
+  user: AuthUser;
 };
 
-/**
- * FIXED: split "auth truth" vs "request state"
- * - authStatus: only changes when auth truth changes
- * - requestStatus: only for loading/errors
- */
 type AuthState = {
-  user: User | null;
+  user: AuthUser | null;
   authStatus: "unknown" | "authenticated" | "guest";
   requestStatus: "idle" | "loading" | "error";
   error: string | null;
+  fieldErrors: ApiErrors;
+  successMessage: string | null;
   meChecked: boolean;
+};
+
+type HttpErrorLike = {
+  response?: {
+    data?: {
+      message?: string;
+      errors?: ApiErrors;
+    };
+  };
 };
 
 const initialState: AuthState = {
@@ -48,10 +41,26 @@ const initialState: AuthState = {
   authStatus: "unknown",
   requestStatus: "idle",
   error: null,
+  fieldErrors: {},
+  successMessage: null,
   meChecked: false,
 };
 
-export const authMe = createAsyncThunk<User, void, { rejectValue: string }>(
+function getApiErrors(error: unknown): ApiErrors {
+  return (error as HttpErrorLike)?.response?.data?.errors ?? {};
+}
+
+function getApiMessage(error: unknown, fallback: string) {
+  const response = (error as HttpErrorLike)?.response?.data;
+  return (
+    response?.message ||
+    response?.errors?.email?.[0] ||
+    response?.errors?.password?.[0] ||
+    fallback
+  );
+}
+
+export const authMe = createAsyncThunk<AuthUser, void, { rejectValue: string }>(
   "auth/me",
   async (_, { rejectWithValue }) => {
     try {
@@ -65,59 +74,98 @@ export const authMe = createAsyncThunk<User, void, { rejectValue: string }>(
 );
 
 export const login = createAsyncThunk<
-  User,
+  AuthUser,
   { email: string; password: string; remember?: boolean },
-  { rejectValue: string }
+  { rejectValue: { message: string; fieldErrors: ApiErrors } }
 >("auth/login", async (payload, { rejectWithValue }) => {
   try {
     await csrf();
-    const { data } = await http.post<LoginResponse>("/auth/login", payload);
+    const { data } = await http.post<AuthResponse>("/auth/login", payload);
 
     if (!data?.ok || !data?.user) {
-      return rejectWithValue("Unexpected login response.");
+      return rejectWithValue({
+        message: "Unexpected login response.",
+        fieldErrors: {},
+      });
     }
 
     return data.user;
-  } catch (e: any) {
-    const status = e?.response?.status;
-
-    if (status === 302) {
-      return rejectWithValue(
-        "Server redirected the login request (302). Remove 'guest' middleware or return JSON for already-authenticated users.",
-      );
-    }
-
-    const msg =
-      e?.response?.data?.message ||
-      e?.response?.data?.errors?.email?.[0] ||
-      e?.response?.data?.errors?.password?.[0] ||
-      (status === 419
-        ? "CSRF token mismatch. Call /sanctum/csrf-cookie first."
-        : null) ||
-      "Login failed";
-
-    return rejectWithValue(msg);
+  } catch (error: unknown) {
+    return rejectWithValue({
+      message: getApiMessage(error, "Login failed."),
+      fieldErrors: getApiErrors(error),
+    });
   }
 });
 
-export const register = createAsyncThunk<
-  User,
-  { name: string; email: string; password: string; password_confirmation: string },
-  { rejectValue: string }
->("auth/register", async (payload, { rejectWithValue }) => {
+export const registerCustomer = createAsyncThunk<
+  { user: AuthUser; message: string },
+  {
+    first_name: string;
+    last_name: string;
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+    password_confirmation: string;
+    role: "customer";
+    terms: boolean;
+  },
+  { rejectValue: { message: string; fieldErrors: ApiErrors } }
+>("auth/registerCustomer", async (payload, { rejectWithValue }) => {
   try {
     await csrf();
-    const { data } = await http.post<LoginResponse>("/auth/register", payload);
+    const { data } = await http.post<AuthResponse>("/auth/register/customer", payload);
 
-    // If your backend doesn't return { ok, user } for register, adjust here.
     if (!data?.ok || !data?.user) {
-      return rejectWithValue("Unexpected register response.");
+      return rejectWithValue({
+        message: data?.message || "Unexpected register response.",
+        fieldErrors: data?.errors ?? {},
+      });
     }
 
-    return data.user;
-  } catch (e: any) {
-    const msg = e?.response?.data?.message || "Register failed";
-    return rejectWithValue(msg);
+    return {
+      user: data.user,
+      message: data.message || "Customer account created successfully.",
+    };
+  } catch (error: unknown) {
+    return rejectWithValue({
+      message: getApiMessage(error, "Customer registration failed."),
+      fieldErrors: getApiErrors(error),
+    });
+  }
+});
+
+export const registerAgency = createAsyncThunk<
+  { message: string },
+  FormData,
+  { rejectValue: { message: string; fieldErrors: ApiErrors } }
+>("auth/registerAgency", async (payload, { rejectWithValue }) => {
+  try {
+    await csrf();
+    const { data } = await http.post<AuthResponse>("/auth/register/agency", payload, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    if (!data?.ok) {
+      return rejectWithValue({
+        message: data?.message || "Unexpected agency registration response.",
+        fieldErrors: data?.errors ?? {},
+      });
+    }
+
+    return {
+      message:
+        data.message ||
+        "Agency account created. Your workspace is pending approval before dashboard access is enabled.",
+    };
+  } catch (error: unknown) {
+    return rejectWithValue({
+      message: getApiMessage(error, "Agency registration failed."),
+      fieldErrors: getApiErrors(error),
+    });
   }
 });
 
@@ -127,7 +175,7 @@ export const logout = createAsyncThunk<void, void, { rejectValue: string }>(
     try {
       await csrf();
       await http.post("/auth/logout");
-    } catch (e: any) {
+    } catch {
       return rejectWithValue("Logout failed");
     }
   },
@@ -139,97 +187,99 @@ const authSlice = createSlice({
   reducers: {
     clearAuthError(state) {
       state.error = null;
-      // If you want to clear error requestStatus too:
+      state.fieldErrors = {};
+      state.successMessage = null;
       if (state.requestStatus === "error") state.requestStatus = "idle";
     },
   },
   extraReducers: (builder) => {
     builder
-      // -----------------------
-      // ME (session check)
-      // -----------------------
-      .addCase(authMe.pending, (s) => {
-        s.requestStatus = "loading";
-        s.error = null;
+      .addCase(authMe.pending, (state) => {
+        state.requestStatus = "loading";
+        state.error = null;
       })
-      .addCase(authMe.fulfilled, (s, a) => {
-        s.user = a.payload;
-        s.authStatus = "authenticated";
-        s.requestStatus = "idle";
-        s.meChecked = true;
+      .addCase(authMe.fulfilled, (state, action) => {
+        state.user = action.payload;
+        state.authStatus = "authenticated";
+        state.requestStatus = "idle";
+        state.meChecked = true;
       })
-      .addCase(authMe.rejected, (s) => {
-        s.user = null;
-        s.authStatus = "guest";
-        s.requestStatus = "idle";
-        s.meChecked = true;
+      .addCase(authMe.rejected, (state) => {
+        state.user = null;
+        state.authStatus = "guest";
+        state.requestStatus = "idle";
+        state.meChecked = true;
       })
-
-      // -----------------------
-      // LOGIN
-      // -----------------------
-      .addCase(login.pending, (s) => {
-        s.requestStatus = "loading";
-        s.error = null;
+      .addCase(login.pending, (state) => {
+        state.requestStatus = "loading";
+        state.error = null;
+        state.fieldErrors = {};
+        state.successMessage = null;
       })
-      .addCase(login.fulfilled, (s, a) => {
-        s.user = a.payload;
-        s.authStatus = "authenticated";
-        s.requestStatus = "idle";
+      .addCase(login.fulfilled, (state, action) => {
+        state.user = action.payload;
+        state.authStatus = "authenticated";
+        state.requestStatus = "idle";
       })
-      .addCase(login.rejected, (s, a: any) => {
-        s.user = null;
-        s.authStatus = "guest"; // auth truth after failed login
-        s.requestStatus = "error";
-        s.error = a.payload || "Login failed";
+      .addCase(login.rejected, (state, action) => {
+        state.user = null;
+        state.authStatus = "guest";
+        state.requestStatus = "error";
+        state.error = action.payload?.message || "Login failed.";
+        state.fieldErrors = action.payload?.fieldErrors ?? {};
       })
-
-      // -----------------------
-      // REGISTER
-      // -----------------------
-      .addCase(register.pending, (s) => {
-        s.requestStatus = "loading";
-        s.error = null;
+      .addCase(registerCustomer.pending, (state) => {
+        state.requestStatus = "loading";
+        state.error = null;
+        state.fieldErrors = {};
+        state.successMessage = null;
       })
-      .addCase(register.fulfilled, (s, a) => {
-        s.user = a.payload;
-        s.authStatus = "authenticated";
-        s.requestStatus = "idle";
+      .addCase(registerCustomer.fulfilled, (state, action) => {
+        state.requestStatus = "idle";
+        state.error = null;
+        state.fieldErrors = {};
+        state.successMessage = action.payload.message;
       })
-      .addCase(register.rejected, (s, a: any) => {
-        s.requestStatus = "error";
-        s.error = a.payload || "Register failed";
+      .addCase(registerCustomer.rejected, (state, action) => {
+        state.requestStatus = "error";
+        state.error = action.payload?.message || "Customer registration failed.";
+        state.fieldErrors = action.payload?.fieldErrors ?? {};
       })
-
-      // -----------------------
-      // LOGOUT
-      // -----------------------
-      .addCase(logout.pending, (s) => {
-        s.requestStatus = "loading";
-        s.error = null;
+      .addCase(registerAgency.pending, (state) => {
+        state.requestStatus = "loading";
+        state.error = null;
+        state.fieldErrors = {};
+        state.successMessage = null;
       })
-      .addCase(logout.fulfilled, (s) => {
-        s.user = null;
-        s.authStatus = "guest";
-        s.requestStatus = "idle";
-        s.error = null;
+      .addCase(registerAgency.fulfilled, (state, action) => {
+        state.requestStatus = "idle";
+        state.error = null;
+        state.fieldErrors = {};
+        state.successMessage = action.payload.message;
       })
-      .addCase(logout.rejected, (s, a: any) => {
-        // If logout fails, keep user as-is, but show error
-        s.requestStatus = "error";
-        s.error = a.payload || "Logout failed";
+      .addCase(registerAgency.rejected, (state, action) => {
+        state.requestStatus = "error";
+        state.error = action.payload?.message || "Agency registration failed.";
+        state.fieldErrors = action.payload?.fieldErrors ?? {};
+      })
+      .addCase(logout.pending, (state) => {
+        state.requestStatus = "loading";
+        state.error = null;
+      })
+      .addCase(logout.fulfilled, (state) => {
+        state.user = null;
+        state.authStatus = "guest";
+        state.requestStatus = "idle";
+        state.error = null;
+        state.fieldErrors = {};
+        state.successMessage = null;
+      })
+      .addCase(logout.rejected, (state, action) => {
+        state.requestStatus = "error";
+        state.error = action.payload || "Logout failed";
       });
   },
 });
 
 export const { clearAuthError } = authSlice.actions;
 export default authSlice.reducer;
-
-/**
- * Component usage (direct)
- *
- * const { authStatus, requestStatus, user } = useSelector((s:any)=>s.auth);
- * const isAuthenticated = authStatus === "authenticated";
- * const isChecking = authStatus === "unknown" && requestStatus === "loading";
- */
-  

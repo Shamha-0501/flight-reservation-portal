@@ -793,7 +793,7 @@ export default function BookingPage() {
               url.searchParams.set("login_email", email);
               const next = `${url.pathname}${url.search}`;
 
-              router.push(`/SignIn?next=${encodeURIComponent(next)}`);
+              router.push(`/login?next=${encodeURIComponent(next)}`);
             }}
             emailVerificationRequired={authStatus !== "authenticated"}
             emailVerificationCompleted={Boolean(verifiedEmail)}
