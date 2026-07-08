@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import PreviewDropdown, {
+  type PreviewDropdownOption,
+} from "@/src/shared/ui/PreviewDropdown";
 import type {
   InputHTMLAttributes,
   ReactNode,
-  SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
 
@@ -15,6 +17,8 @@ type AuthShellProps = {
   aside?: ReactNode;
   centered?: boolean;
   centeredMaxWidthClass?: string;
+  centeredOuterMaxWidthClass?: string;
+  contentClassName?: string;
 };
 
 export function AuthShell({
@@ -24,12 +28,14 @@ export function AuthShell({
   aside,
   centered = false,
   centeredMaxWidthClass = "max-w-xl",
+  centeredOuterMaxWidthClass = "max-w-3xl",
+  contentClassName,
 }: AuthShellProps) {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(14,116,144,0.16),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(37,99,235,0.14),transparent_32%),linear-gradient(180deg,#eef7ff_0%,#f8fbff_36%,#ffffff_100%)]">
       <div
         className={`mx-auto min-h-screen w-full px-4 py-10 sm:px-6 lg:px-8 lg:py-14 ${
-          centered ? "flex max-w-3xl items-center justify-center" : "grid max-w-7xl gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(480px,0.85fr)]"
+          centered ? `flex w-full items-center justify-center ${centeredOuterMaxWidthClass}` : "grid max-w-7xl gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(480px,0.85fr)]"
         }`}
       >
         {!centered ? (
@@ -53,7 +59,13 @@ export function AuthShell({
         ) : null}
 
         <section className={`flex items-center ${centered ? "w-full justify-center" : ""}`}>
-          <div className={`rounded-[2rem] border border-white/70 bg-white/90 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur sm:p-8 ${centered ? `w-full ${centeredMaxWidthClass}` : "w-full"}`}>
+          <div
+            className={
+              centered && contentClassName
+                ? contentClassName
+                : `rounded-[2rem] border border-white/70 bg-white/90 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur sm:p-8 ${centered ? `w-full ${centeredMaxWidthClass}` : "w-full"}`
+            }
+          >
             {children}
           </div>
         </section>
@@ -101,7 +113,7 @@ export function AuthAlert({
         : "border-rose-200 bg-rose-50 text-rose-700";
 
   return (
-    <div className={`rounded-2xl border px-4 py-3 text-sm font-medium ${className}`}>
+    <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${className}`}>
       {message}
     </div>
   );
@@ -136,7 +148,7 @@ export function AuthInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-50 ${props.className ?? ""}`.trim()}
+      className={`h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-50 ${props.className ?? ""}`.trim()}
     />
   );
 }
@@ -145,16 +157,32 @@ export function AuthTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>)
   return (
     <textarea
       {...props}
-      className={`min-h-28 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-50 ${props.className ?? ""}`.trim()}
+      className={`min-h-28 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-50 ${props.className ?? ""}`.trim()}
     />
   );
 }
 
-export function AuthSelect(props: SelectHTMLAttributes<HTMLSelectElement>) {
+export function AuthSelect({
+  options,
+  placeholder,
+  value,
+  onChange,
+  className,
+}: {
+  options: PreviewDropdownOption[];
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+}) {
   return (
-    <select
-      {...props}
-      className={`h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-950 outline-none transition focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-50 ${props.className ?? ""}`.trim()}
+    <PreviewDropdown
+      value={value}
+      options={options}
+      placeholder={placeholder}
+      onChange={onChange}
+      className={`h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-950 focus:border-sky-300 focus:ring-4 focus:ring-sky-50 ${className ?? ""}`.trim()}
+      menuClassName="rounded-xl"
     />
   );
 }
@@ -172,7 +200,7 @@ export function AuthSubmit({
     <button
       type="submit"
       disabled={loading}
-      className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-sky-600 px-4 text-sm font-bold text-white shadow-[0_14px_34px_rgba(2,132,199,0.22)] transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-sky-600 px-4 text-sm font-bold text-white shadow-[0_14px_34px_rgba(2,132,199,0.22)] transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {loading ? loadingLabel : label}
     </button>
@@ -201,7 +229,7 @@ export function AuthLinks({
 
 function FeatureCard({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-2xl border border-white/70 bg-white/70 p-4 shadow-sm backdrop-blur">
+    <div className="rounded-xl border border-white/70 bg-white/70 p-4 shadow-sm backdrop-blur">
       <div className="text-sm font-bold text-slate-950">{title}</div>
       <p className="mt-2 text-sm leading-6 text-slate-600">{text}</p>
     </div>

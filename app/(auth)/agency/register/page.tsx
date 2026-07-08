@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "@/src/shared/redux/store";
 import { clearAuthError, registerAgency } from "@/src/shared/redux/store/authSlice";
@@ -23,6 +24,13 @@ const services = [
   "Airport assistance",
   "Business travel",
   "Student travel",
+] as const;
+
+const countryOptions = [
+  { value: "Sri Lanka", label: "Sri Lanka" },
+  { value: "United Arab Emirates", label: "United Arab Emirates" },
+  { value: "India", label: "India" },
+  { value: "United Kingdom", label: "United Kingdom" },
 ] as const;
 
 type FormState = {
@@ -60,6 +68,7 @@ const initialState: FormState = {
 };
 
 export default function AgencyRegisterPage() {
+  const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
   const { error, fieldErrors, requestStatus, successMessage } = useSelector(
     (state: RootState) => state.auth,
@@ -85,6 +94,13 @@ export default function AgencyRegisterPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form]);
+
+  useEffect(() => {
+    if (successMessage) {
+      const timeout = window.setTimeout(() => router.push("/login"), 1200);
+      return () => window.clearTimeout(timeout);
+    }
+  }, [router, successMessage]);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -127,7 +143,7 @@ export default function AgencyRegisterPage() {
           description="This flow creates the agency record, the first tenant owner account, and the link between them."
         />
 
-        <div className="rounded-[1.75rem] border border-sky-100 bg-[linear-gradient(135deg,rgba(240,249,255,0.9),rgba(255,255,255,0.95))] p-5 shadow-sm">
+        <div className="rounded-[1.25rem] border border-sky-100 bg-[linear-gradient(135deg,rgba(240,249,255,0.9),rgba(255,255,255,0.95))] p-5 shadow-sm">
           <div className="text-sm font-bold text-slate-950">Approval workflow</div>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             New agencies start with a pending status. An admin, super admin, or system developer
@@ -136,7 +152,7 @@ export default function AgencyRegisterPage() {
         </div>
 
         <form onSubmit={onSubmit} className="space-y-6">
-          <section className="space-y-5 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <section className="space-y-5 rounded-[1.25rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div>
               <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-sky-700">
                 Section 1
@@ -187,16 +203,11 @@ export default function AgencyRegisterPage() {
 
               <AuthField label="Country" htmlFor="country" error={fieldErrors.country?.[0]}>
                 <AuthSelect
-                  id="country"
                   value={form.country}
-                  onChange={(event) => updateField("country", event.target.value)}
-                >
-                  <option value="">Select country</option>
-                  <option value="Sri Lanka">Sri Lanka</option>
-                  <option value="United Arab Emirates">United Arab Emirates</option>
-                  <option value="India">India</option>
-                  <option value="United Kingdom">United Kingdom</option>
-                </AuthSelect>
+                  options={[...countryOptions]}
+                  placeholder="Select country"
+                  onChange={(value) => updateField("country", value)}
+                />
               </AuthField>
 
               <AuthField label="City" htmlFor="city" error={fieldErrors.city?.[0]}>
@@ -257,7 +268,7 @@ export default function AgencyRegisterPage() {
                 {services.map((service) => (
                   <label
                     key={service}
-                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 transition hover:border-sky-200 hover:bg-sky-50/60"
+                    className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 transition hover:border-sky-200 hover:bg-sky-50/60"
                   >
                     <input
                       type="checkbox"
@@ -272,7 +283,7 @@ export default function AgencyRegisterPage() {
             </div>
           </section>
 
-          <section className="space-y-5 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <section className="space-y-5 rounded-[1.25rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div>
               <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-sky-700">
                 Section 2

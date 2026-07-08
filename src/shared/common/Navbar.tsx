@@ -16,8 +16,8 @@ export const Navbar = () => {
   const dispatch = useDispatch<AppDispatch>();
   const pathname = usePathname();
   const { authStatus, user } = useSelector((state: RootState) => state.auth);
-  const [open, setOpen] = useState(false); // mobile menu
-  const [userMenuOpen, setUserMenuOpen] = useState(false); // user dropdown
+  const [open, setOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -25,7 +25,6 @@ export const Navbar = () => {
   const dashboardTarget =
     getPostLoginAccess(user).kind === "customer" ? "/bookings" : "/dashboard";
 
-  // Close menus on ESC
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -37,7 +36,6 @@ export const Navbar = () => {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Close user dropdown on outside click
   useEffect(() => {
     if (!userMenuOpen) return;
 
@@ -51,7 +49,6 @@ export const Navbar = () => {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [userMenuOpen]);
 
-  // Lock scroll when mobile menu is open
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -73,14 +70,12 @@ export const Navbar = () => {
     <header className="w-full border-b border-border bg-bg text-fg">
       <Container size="container">
         <div className="mx-auto flex h-14 items-center justify-between max-sm:px-4 sm:h-16">
-          {/* Brand */}
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/home" className="flex items-center gap-2">
             <span className="text-sm font-semibold sm:text-base">
               Flight <span className="text-primary">Portal</span>
             </span>
           </Link>
 
-          {/* Desktop nav */}
           <nav className="hidden items-center gap-2 sm:flex sm:gap-3">
             <Link
               href="/agency/register"
@@ -103,7 +98,6 @@ export const Navbar = () => {
                   <FaCircleUser size={32} />
                 </button>
 
-                {/* Dropdown */}
                 {userMenuOpen && (
                   <div
                     role="menu"
@@ -144,13 +138,13 @@ export const Navbar = () => {
               <>
                 <Link
                   href="/login"
-                  className="rounded-md px-3 py-2 text-sm text-center font-semibold text-primary border border-primary"
+                  className="rounded-md border border-primary px-3 py-2 text-center text-sm font-semibold text-primary"
                 >
                   Login
                 </Link>
                 <Link
                   href="/register"
-                  className="rounded-md bg-primary px-3 py-2 text-sm text-center font-semibold text-white"
+                  className="rounded-md bg-primary px-3 py-2 text-center text-sm font-semibold text-white"
                 >
                   Sign Up
                 </Link>
@@ -158,7 +152,6 @@ export const Navbar = () => {
             )}
           </nav>
 
-          {/* Mobile menu button */}
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
@@ -171,7 +164,6 @@ export const Navbar = () => {
           </button>
         </div>
 
-        {/* Mobile full-screen overlay */}
         {open && (
           <div className="fixed inset-0 z-[999] sm:hidden">
             <button
@@ -195,6 +187,13 @@ export const Navbar = () => {
 
               <nav className="flex h-[calc(100%-3.5rem)] flex-col gap-1 px-4 py-4">
                 <Link
+                  href="/home"
+                  className="w-full rounded-lg px-3 py-3 text-sm font-semibold hover:bg-muted"
+                  onClick={() => setOpen(false)}
+                >
+                  Flight Portal
+                </Link>
+                <Link
                   href="/agency/register"
                   className="w-full rounded-lg px-3 py-3 text-sm font-semibold hover:bg-muted"
                   onClick={() => setOpen(false)}
@@ -211,14 +210,14 @@ export const Navbar = () => {
                 <div className="mt-auto grid gap-2 pt-4">
                   <Link
                     href="/login"
-                    className="w-full rounded-lg px-3 py-3 border border-primary text-sm text-center font-semibold text-primary hover:bg-muted"
+                    className="w-full rounded-lg border border-primary px-3 py-3 text-center text-sm font-semibold text-primary hover:bg-muted"
                     onClick={() => setOpen(false)}
                   >
                     Login
                   </Link>
                   <Link
                     href="/register"
-                    className="w-full rounded-lg bg-primary px-3 py-3 text-sm text-center font-semibold text-white"
+                    className="w-full rounded-lg bg-primary px-3 py-3 text-center text-sm font-semibold text-white"
                     onClick={() => setOpen(false)}
                   >
                     Sign Up
