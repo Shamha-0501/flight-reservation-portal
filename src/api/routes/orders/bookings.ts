@@ -69,10 +69,13 @@ type BookingListResponse = {
 export async function fetchBookings(params: {
   tenantKey: string;
   email?: string;
+  search?: string;
   status?: string;
   cancellation_status?: string;
   refund_status?: string;
+  cancellation_scope?: "all";
   page?: number;
+  per_page?: number;
 }): Promise<BookingListResponse> {
   try {
     const response = await http.get("/api/bookings", { params });

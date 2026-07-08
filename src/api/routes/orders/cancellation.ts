@@ -46,11 +46,14 @@ export async function getOrderRefundableStatus(orderId: string | number) {
   }
 }
 
-export async function createOrderCancellation(orderId: string | number) {
+export async function createOrderCancellation(
+  orderId: string | number,
+  tenantKey?: string
+) {
   try {
     const response = await http.post<OrderCancellationResponse>(
       "/api/order-cancellations",
-      { order_id: orderId }
+      { order_id: orderId, tenantKey }
     );
     return response.data;
   } catch (error: unknown) {
@@ -76,11 +79,16 @@ export async function getOrderCancellation(cancellationId: string) {
 export async function confirmOrderCancellation(params: {
   cancellationId: string;
   orderId: string | number;
+  tenantKey?: string;
 }) {
   try {
     const response = await http.post<OrderCancellationResponse>(
       `/api/order-cancellations/${params.cancellationId}/confirm/${params.orderId}`,
-      { order_id: params.orderId, cancellation_id: params.cancellationId }
+      {
+        order_id: params.orderId,
+        cancellation_id: params.cancellationId,
+        tenantKey: params.tenantKey,
+      }
     );
     return response.data;
   } catch (error: unknown) {
@@ -92,6 +100,7 @@ export async function confirmOrderCancellation(params: {
 
 export async function confirmOrderRefund(params: {
   orderId: string | number;
+  tenantKey?: string;
   reference?: string;
   notes?: string;
 }) {
@@ -99,6 +108,7 @@ export async function confirmOrderRefund(params: {
     const response = await http.post<OrderCancellationResponse>(
       `/api/orders/${params.orderId}/refunds/confirm`,
       {
+        tenantKey: params.tenantKey,
         reference: params.reference,
         notes: params.notes,
       }

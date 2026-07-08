@@ -432,7 +432,7 @@ export default function BookingDetailsPage() {
     setQuoteLoading(true);
 
     try {
-      const response = await createOrderCancellation(order.id);
+      const response = await createOrderCancellation(order.id, tenantKey);
       const responseData = (response?.data ?? response) as Record<string, unknown>;
       const id =
         typeof responseData?.id === "string"
@@ -473,6 +473,7 @@ export default function BookingDetailsPage() {
       await confirmOrderCancellation({
         cancellationId,
         orderId: order.id,
+        tenantKey,
       });
       const latest = await getOrderCancellation(cancellationId);
       const latestData = (latest?.data ?? latest) as Record<string, unknown>;
@@ -498,7 +499,7 @@ export default function BookingDetailsPage() {
 
     setConfirmingRefund(true);
     try {
-      await confirmOrderRefund({ orderId: order.id });
+      await confirmOrderRefund({ orderId: order.id, tenantKey });
       if (bookingId && tenantKey) {
         await loadBookingDetails(bookingId, tenantKey);
       }
