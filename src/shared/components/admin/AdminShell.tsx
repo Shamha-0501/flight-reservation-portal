@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Bell, ChevronDown, LogOut, Menu, User, X } from "lucide-react";
 import { useAuth } from "@/src/shared/auth/AuthProvider";
 import { useAppDispatch } from "@/src/shared/redux/store/hooks";
@@ -26,20 +26,52 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const dispatch = useAppDispatch();
   const {
     user,
+    role,
     selectedTenant,
     roleLabel,
     isAdmin,
     isPlatformAdmin,
+    isTenantOwner,
+    isTenantWorkspaceRole,
+    canManageTenantUsers,
     loading,
     isAuthenticated,
     access,
-  } =
-    useAuth();
+  } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
+  const isInvitationRoute = pathname?.startsWith("/admin/users/invite");
+  const workspaceLabel = isPlatformAdmin
+    ? role === "system_developer"
+      ? "System Console"
+      : "Admin Workspace"
+    : selectedTenant?.name ?? "Tenant Workspace";
+  const visibleNavItems = useMemo(
+    () =>
+      adminNavItems.filter((item) => {
+        if (item.requiresTenantOwner) {
+          return isPlatformAdmin || isTenantOwner;
+        }
+        if (item.audience === "all") return true;
+        if (item.audience === "platform") return isPlatformAdmin;
+        if (item.audience === "tenant") {
+          return isTenantWorkspaceRole && (!item.requiresTenantLeadership || canManageTenantUsers);
+        }
+
+        return false;
+      }),
+    [canManageTenantUsers, isPlatformAdmin, isTenantOwner, isTenantWorkspaceRole],
+  );
+  const activeRoute =
+    visibleNavItems.find((item) => pathname?.startsWith(item.match)) ??
+    visibleNavItems[0];
 
   useEffect(() => {
+    if (isInvitationRoute) {
+      return;
+    }
+
     if (loading) return;
 
     if (!isAuthenticated) {
@@ -53,8 +85,29 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
     if (!isAdmin) {
       router.replace("/bookings");
+      return;
     }
-  }, [access.kind, isAdmin, isAuthenticated, loading, pathname, router]);
+
+    if (!visibleNavItems.length) {
+      return;
+    }
+
+    const isRouteAllowed = visibleNavItems.some((item) =>
+      pathname?.startsWith(item.match),
+    );
+    if (!isRouteAllowed) {
+      router.replace(visibleNavItems[0].href);
+    }
+  }, [
+    access.kind,
+    isAdmin,
+    isAuthenticated,
+    isInvitationRoute,
+    loading,
+    pathname,
+    router,
+    visibleNavItems,
+  ]);
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -73,6 +126,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
     setProfileOpen(false);
     await dispatch(logout());
     router.replace("/login");
+  }
+
+  if (isInvitationRoute) {
+    return <>{children}</>;
   }
 
   if (loading || !isAuthenticated) return <LoadingScreen />;
@@ -97,19 +154,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   if (!isAdmin) return <LoadingScreen />;
 
-  const tenantName = isPlatformAdmin
-    ? "Flight Portal"
-    : selectedTenant?.name ?? "Flight Portal";
   const userInitial = user?.name?.charAt(0)?.toUpperCase() ?? "A";
-  const visibleNavItems = isPlatformAdmin
-    ? adminNavItems.filter((item) =>
-        ["/admin/dashboard", "/admin/agencies", "/admin/reports", "/admin/settings"].includes(
-          item.href,
-        ),
-      )
-    : adminNavItems;
-  const activeRoute =
-    visibleNavItems.find((item) => pathname?.startsWith(item.match)) ?? visibleNavItems[0];
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
@@ -169,13 +214,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="border-t border-slate-200 p-4">
-            <div className="rounded-2xl bg-slate-50 p-3">
-              <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                Active workspace
-              </div>
-              <div className="truncate text-sm font-extrabold text-slate-950">
-                {tenantName}
-              </div>
+          <div className="rounded-2xl bg-slate-50 p-3">
+            <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+              Active workspace
+            </div>
+            <div className="truncate text-sm font-extrabold text-slate-950">
+              {workspaceLabel}
+            </div>
             <div className="mt-1 truncate text-xs font-semibold text-slate-500">
               {roleLabel}
             </div>
@@ -196,9 +241,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </button>
 
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-extrabold text-slate-950">
-                {tenantName}
-              </div>
+              <div className="truncate text-sm font-extrabold text-slate-950">{workspaceLabel}</div>
               <div className="truncate text-xs font-semibold text-slate-500">
                 {activeRoute?.title ?? "Admin"} · {roleLabel}
               </div>
@@ -214,48 +257,48 @@ export function AdminShell({ children }: { children: ReactNode }) {
               </button>
 
               <div className="relative" ref={profileRef}>
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
-                onClick={() => setProfileOpen((value) => !value)}
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-extrabold text-white">
-                  {userInitial}
-                </span>
-                <span className="hidden max-w-40 truncate sm:block">
-                  {user?.name ?? "Admin"}
-                </span>
-                <ChevronDown className="h-4 w-4 text-slate-400" />
-              </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+                  onClick={() => setProfileOpen((value) => !value)}
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-extrabold text-white">
+                    {userInitial}
+                  </span>
+                  <span className="hidden max-w-40 truncate sm:block">
+                    {user?.name ?? "Admin"}
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-slate-400" />
+                </button>
 
-              {profileOpen ? (
-                <div className="absolute right-0 top-full z-30 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                  <div className="border-b border-slate-100 px-4 py-3">
-                    <div className="truncate text-sm font-extrabold text-slate-950">
-                      {user?.name ?? "Admin"}
+                {profileOpen ? (
+                  <div className="absolute right-0 top-full z-30 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                    <div className="border-b border-slate-100 px-4 py-3">
+                      <div className="truncate text-sm font-extrabold text-slate-950">
+                        {user?.name ?? "Admin"}
+                      </div>
+                      <div className="mt-0.5 truncate text-xs font-medium text-slate-500">
+                        {user?.email ?? workspaceLabel}
+                      </div>
                     </div>
-                    <div className="mt-0.5 truncate text-xs font-medium text-slate-500">
-                      {user?.email ?? tenantName}
-                    </div>
+                    <Link
+                      href="/profile"
+                      className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      onClick={() => setProfileOpen(false)}
+                    >
+                      <User className="h-4 w-4" />
+                      Profile
+                    </Link>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </button>
                   </div>
-                  <Link
-                    href="/profile"
-                    className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                    onClick={() => setProfileOpen(false)}
-                  >
-                    <User className="h-4 w-4" />
-                    Profile
-                  </Link>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-rose-600 hover:bg-rose-50"
-                    onClick={handleLogout}
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Logout
-                  </button>
-                </div>
-              ) : null}
+                ) : null}
               </div>
 
             </div>
