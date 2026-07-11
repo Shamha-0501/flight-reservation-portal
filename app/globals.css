@@ -1,0 +1,48 @@
+@import "react-datepicker/dist/react-datepicker.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* globals.css */
+:root {
+  --bg: 255 255 255;
+  --fg: 17 24 39;
+
+  /* primary = blue */
+  --primary: 59 130 246;      /* blue-500 */
+
+  /* secondary = gray */
+  --secondary: 107 114 128;   /* gray-500 */
+
+  --border: 229 231 235;
+  --muted: 243 244 246;
+  --menu: 217 217 217;
+  --icon: 33 33 33;
+  --radius: 12px;
+}
+
+html[data-theme="dark"] {
+  --bg: 17 24 39;
+  --fg: 243 244 246;
+
+  /* primary = lighter blue for dark bg */
+  --primary: 147 197 253;     /* blue-200 */
+
+  /* secondary = gray for dark */
+  --secondary: 156 163 175;   /* gray-400 */
+
+  --border: 55 65 81;
+  --muted: 31 41 55;
+  --menu: 33 33 33;
+  --icon: 217 217 217;
+}
+
+/* Hide scrollbars but keep scroll behavior */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
