@@ -6,7 +6,7 @@ import { Menu, X } from "lucide-react";
 import { FaCircleUser } from "react-icons/fa6";
 import Container from "../ui/Container";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/store/authSlice";
 import type { AppDispatch, RootState } from "../redux/store";
@@ -14,6 +14,7 @@ import { getPostLoginAccess } from "../auth/authModel";
 
 export const Navbar = () => {
   const dispatch = useDispatch<AppDispatch>();
+  const router = useRouter();
   const pathname = usePathname();
   const { authStatus, user } = useSelector((state: RootState) => state.auth);
   const [open, setOpen] = useState(false);
@@ -22,8 +23,9 @@ export const Navbar = () => {
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
   const isAuthenticated = authStatus === "authenticated";
-  const dashboardTarget =
-    getPostLoginAccess(user).kind === "customer" ? "/bookings" : "/dashboard";
+  const access = getPostLoginAccess(user);
+  const showBookingsLink = access.kind !== "customer";
+  const dashboardTarget = access.kind === "customer" ? "/bookings" : "/admin/dashboard";
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -61,7 +63,8 @@ export const Navbar = () => {
   const handleLogout = async () => {
     setUserMenuOpen(false);
     setOpen(false);
-    dispatch(logout());
+    await dispatch(logout());
+    router.replace("/login");
   };
 
   if (pathname?.startsWith("/admin")) return null;
@@ -111,6 +114,17 @@ export const Navbar = () => {
                     >
                       Dashboard
                     </Link>
+
+                    {showBookingsLink ? (
+                      <Link
+                        href="/bookings"
+                        role="menuitem"
+                        className="block px-4 py-3 text-sm hover:bg-muted"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        Bookings
+                      </Link>
+                    ) : null}
 
                     <Link
                       href="/profile"
@@ -207,22 +221,57 @@ export const Navbar = () => {
                   <ToggleTheme />
                 </div>
 
-                <div className="mt-auto grid gap-2 pt-4">
-                  <Link
-                    href="/login"
-                    className="w-full rounded-lg border border-primary px-3 py-3 text-center text-sm font-semibold text-primary hover:bg-muted"
-                    onClick={() => setOpen(false)}
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    href="/register"
-                    className="w-full rounded-lg bg-primary px-3 py-3 text-center text-sm font-semibold text-white"
-                    onClick={() => setOpen(false)}
-                  >
-                    Sign Up
-                  </Link>
-                </div>
+                {isAuthenticated ? (
+                  <div className="mt-4 grid gap-2">
+                    <Link
+                      href={dashboardTarget}
+                      className="w-full rounded-lg px-3 py-3 text-sm font-semibold hover:bg-muted"
+                      onClick={() => setOpen(false)}
+                    >
+                      Dashboard
+                    </Link>
+                    {showBookingsLink ? (
+                      <Link
+                        href="/bookings"
+                        className="w-full rounded-lg px-3 py-3 text-sm font-semibold hover:bg-muted"
+                        onClick={() => setOpen(false)}
+                      >
+                        Bookings
+                      </Link>
+                    ) : null}
+                    <Link
+                      href="/profile"
+                      className="w-full rounded-lg px-3 py-3 text-sm font-semibold hover:bg-muted"
+                      onClick={() => setOpen(false)}
+                    >
+                      Profile
+                    </Link>
+                    <button
+                      type="button"
+                      className="w-full rounded-lg px-3 py-3 text-left text-sm font-semibold hover:bg-muted"
+                      onClick={handleLogout}
+                    >
+                      Logout
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-auto grid gap-2 pt-4">
+                    <Link
+                      href="/login"
+                      className="w-full rounded-lg border border-primary px-3 py-3 text-center text-sm font-semibold text-primary hover:bg-muted"
+                      onClick={() => setOpen(false)}
+                    >
+                      Login
+                    </Link>
+                    <Link
+                      href="/register"
+                      className="w-full rounded-lg bg-primary px-3 py-3 text-center text-sm font-semibold text-white"
+                      onClick={() => setOpen(false)}
+                    >
+                      Sign Up
+                    </Link>
+                  </div>
+                )}
               </nav>
             </div>
           </div>

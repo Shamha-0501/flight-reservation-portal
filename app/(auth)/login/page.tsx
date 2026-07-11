@@ -19,11 +19,12 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const dispatch = useDispatch<AppDispatch>();
-  const { error, fieldErrors, requestStatus } = useSelector((state: RootState) => state.auth);
+  const { error, fieldErrors } = useSelector((state: RootState) => state.auth);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ tone: "error" | "info"; text: string } | null>(
     null,
   );
@@ -44,17 +45,22 @@ export default function LoginPage() {
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
+    setIsSubmitting(true);
 
-    const result = await dispatch(login({ email, password, remember }));
-    if (!login.fulfilled.match(result)) return;
+    try {
+      const result = await dispatch(login({ email, password, remember }));
+      if (!login.fulfilled.match(result)) return;
 
-    const next = searchParams.get("next");
-    if (next && next.startsWith("/")) {
-      router.push(next);
-      return;
+      const next = searchParams.get("next");
+      if (next && next.startsWith("/")) {
+        router.push(next);
+        return;
+      }
+
+      router.push("/home");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    router.push("/home");
   }
 
   return (
@@ -122,7 +128,7 @@ export default function LoginPage() {
               <AuthSubmit
                 label="Login"
                 loadingLabel="Logging in..."
-                loading={requestStatus === "loading"}
+                loading={isSubmitting}
               />
             </form>
 

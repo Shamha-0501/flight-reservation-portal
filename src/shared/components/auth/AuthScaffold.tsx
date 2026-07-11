@@ -40,10 +40,10 @@ export function AuthShell({
       >
         {!centered ? (
           <section className="flex flex-col justify-center">
-            <div className="inline-flex w-fit items-center rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-sky-700 backdrop-blur">
+            <div className="inline-flex w-fit items-center rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-sky-700 backdrop-blur">
               Flight Reservation Portal
             </div>
-            <h1 className="mt-5 max-w-xl text-4xl font-extrabold tracking-tight text-slate-950 sm:text-5xl">
+            <h1 className="mt-5 max-w-xl text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
               {title}
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
@@ -87,10 +87,10 @@ export function AuthCardTitle({
 }) {
   return (
     <div>
-      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-sky-700">
+      <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-sky-700">
         {eyebrow}
       </div>
-      <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-950">
+      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
         {title}
       </h2>
       <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
@@ -200,7 +200,7 @@ export function AuthSubmit({
     <button
       type="submit"
       disabled={loading}
-      className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-sky-600 px-4 text-sm font-bold text-white shadow-[0_14px_34px_rgba(2,132,199,0.22)] transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(2,132,199,0.22)] transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {loading ? loadingLabel : label}
     </button>
@@ -230,7 +230,7 @@ export function AuthLinks({
 function FeatureCard({ title, text }: { title: string; text: string }) {
   return (
     <div className="rounded-xl border border-white/70 bg-white/70 p-4 shadow-sm backdrop-blur">
-      <div className="text-sm font-bold text-slate-950">{title}</div>
+      <div className="text-sm font-semibold text-slate-950">{title}</div>
       <p className="mt-2 text-sm leading-6 text-slate-600">{text}</p>
     </div>
   );
