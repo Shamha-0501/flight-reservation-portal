@@ -21,6 +21,7 @@ import {
   AdminButton,
   AdminPage,
   FilterSelect,
+  LoadingSkeleton,
   StatCard,
   SurfaceCard,
   TableShell,
@@ -191,7 +192,7 @@ export default function AdminReportsPage() {
           <DateField label="From" value={fromDate} onChange={setFromDate} max={toDate} />
           <DateField label="To" value={toDate} onChange={setToDate} min={fromDate} />
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Group by</label>
+            <label className="text-sm font-medium text-slate-700">Group by</label>
             <FilterSelect
               value={groupBy}
               onChange={(value) => setGroupBy(value as AdminReportGroupBy)}
@@ -233,18 +234,16 @@ export default function AdminReportsPage() {
           description="Bookings, cancellations, and revenue for each grouped period."
         >
           {loading ? (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Loading report...
-            </div>
+            <LoadingSkeleton />
           ) : null}
 
           <TableShell columns={["Period", "Bookings", "Cancellations", "Revenue"]}>
             {series.map((row) => (
               <tr key={row.label}>
-                <td className="px-4 py-4 text-sm font-bold text-slate-950">{row.label}</td>
+                <td className="px-4 py-4 text-sm font-semibold text-slate-950">{row.label}</td>
                 <td className="px-4 py-4 text-sm text-slate-600">{row.bookings}</td>
                 <td className="px-4 py-4 text-sm text-slate-600">{row.cancellations}</td>
-                <td className="px-4 py-4 text-sm font-bold text-slate-950">
+                <td className="px-4 py-4 text-sm font-semibold text-slate-950">
                   {formatMoney(row.revenue.amount, row.revenue.currency)}
                 </td>
               </tr>
@@ -262,14 +261,14 @@ export default function AdminReportsPage() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                      <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">
                         #{index + 1}
                       </div>
-                      <div className="mt-1 text-sm font-extrabold text-slate-950">{agency.name}</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-950">{agency.name}</div>
                       <div className="mt-1 text-xs font-medium text-slate-500">{agency.key}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm font-extrabold text-slate-950">
+                      <div className="text-sm font-semibold text-slate-950">
                         {formatMoney(agency.revenue.amount, agency.revenue.currency)}
                       </div>
                       <div className="text-xs font-semibold text-slate-500">
@@ -292,10 +291,10 @@ export default function AdminReportsPage() {
         <TableShell columns={["Period", "Bookings", "Cancellations", "Revenue"]}>
           {series.map((row) => (
             <tr key={row.label}>
-              <td className="px-4 py-4 text-sm font-bold text-slate-950">{row.label}</td>
+              <td className="px-4 py-4 text-sm font-semibold text-slate-950">{row.label}</td>
               <td className="px-4 py-4 text-sm text-slate-600">{row.bookings}</td>
               <td className="px-4 py-4 text-sm text-slate-600">{row.cancellations}</td>
-              <td className="px-4 py-4 text-sm font-bold text-slate-950">
+              <td className="px-4 py-4 text-sm font-semibold text-slate-950">
                 {formatMoney(row.revenue.amount, row.revenue.currency)}
               </td>
             </tr>
@@ -321,7 +320,7 @@ function DateField({
 }) {
   return (
     <div className="space-y-2">
-      <label className="text-sm font-bold text-slate-700">{label}</label>
+      <label className="text-sm font-medium text-slate-700">{label}</label>
       <input
         type="date"
         value={value}

@@ -59,10 +59,10 @@ export function PageHeader({
       <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 p-6 text-white sm:p-8">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-100">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">
               {eyebrow}
             </div>
-            <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
               {title}
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-blue-100">
@@ -97,7 +97,7 @@ export function SurfaceCard({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {title ? (
-              <h2 className="text-lg font-extrabold tracking-tight text-slate-950">
+              <h2 className="text-lg font-semibold tracking-tight text-slate-950">
                 {title}
               </h2>
             ) : null}
@@ -130,10 +130,10 @@ export function StatCard({
     <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_18px_46px_rgba(15,23,42,0.08)]">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
             {label}
           </p>
-          <p className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950">
+          <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
             {value}
           </p>
         </div>
@@ -154,7 +154,7 @@ export function StatusBadge({ value }: { value: string }) {
   const tone = getBadgeTone(value);
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ${tone}`}
+      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${tone}`}
     >
       {value}
     </span>
@@ -216,7 +216,7 @@ export function FilterSelect({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
-        className="inline-flex h-11 min-w-[180px] items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-700 outline-none transition hover:bg-white focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex h-11 min-w-[180px] items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 outline-none transition hover:bg-white focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span className="truncate">{value}</span>
         <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
@@ -266,7 +266,7 @@ export function AdminButton({
   disabled?: boolean;
 }) {
   const className = [
-    "inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-bold transition",
+    "inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-semibold transition",
     variant === "primary" && "bg-blue-600 text-white hover:bg-blue-700",
     variant === "secondary" &&
       "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
@@ -313,7 +313,7 @@ export function TableShell({
               {columns.map((column) => (
                 <th
                   key={column}
-                  className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.14em] text-slate-500"
+                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500"
                 >
                   {column}
                 </th>
@@ -339,13 +339,13 @@ export function PaginationPlaceholder() {
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <span className="inline-flex h-10 min-w-10 items-center justify-center rounded-xl bg-blue-600 px-3 text-sm font-bold text-white">
+        <span className="inline-flex h-10 min-w-10 items-center justify-center rounded-xl bg-blue-600 px-3 text-sm font-semibold text-white">
           1
         </span>
-        <span className="inline-flex h-10 min-w-10 items-center justify-center rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-600">
+        <span className="inline-flex h-10 min-w-10 items-center justify-center rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-600">
           2
         </span>
-        <span className="inline-flex h-10 min-w-10 items-center justify-center rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-600">
+        <span className="inline-flex h-10 min-w-10 items-center justify-center rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-600">
           3
         </span>
         <button
@@ -384,7 +384,7 @@ export function Drawer({
       />
       <div className="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white shadow-2xl">
         <div className="border-b border-slate-200 px-5 py-4">
-          <h3 className="text-lg font-extrabold tracking-tight text-slate-950">
+          <h3 className="text-lg font-semibold tracking-tight text-slate-950">
             {title}
           </h3>
           <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p>
@@ -483,7 +483,7 @@ export function EmptyState({
 }) {
   return (
     <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-      <h3 className="text-lg font-extrabold text-slate-950">{title}</h3>
+      <h3 className="text-lg font-semibold text-slate-950">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
         {description}
       </p>
@@ -493,14 +493,35 @@ export function EmptyState({
 
 export function LoadingSkeleton() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="h-4 w-24 animate-pulse rounded bg-slate-200" />
-          <div className="mt-4 h-8 w-20 animate-pulse rounded bg-slate-200" />
-          <div className="mt-3 h-4 w-32 animate-pulse rounded bg-slate-100" />
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="h-3 w-20 animate-pulse rounded-full bg-slate-200" />
+            <div className="mt-4 h-8 w-24 animate-pulse rounded-full bg-slate-200" />
+            <div className="mt-3 h-4 w-32 animate-pulse rounded-full bg-slate-100" />
+          </div>
+        ))}
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+          <div className="h-4 w-32 animate-pulse rounded-full bg-slate-200" />
         </div>
-      ))}
+        <div className="space-y-3 p-4">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="h-4 w-40 animate-pulse rounded-full bg-slate-200" />
+                  <div className="h-3 w-56 animate-pulse rounded-full bg-slate-100" />
+                </div>
+                <div className="h-8 w-24 animate-pulse rounded-xl bg-white" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

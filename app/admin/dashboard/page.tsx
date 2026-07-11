@@ -28,6 +28,7 @@ import { useAuth } from "@/src/shared/auth/AuthProvider";
 import {
   AdminPage,
   AdminButton,
+  LoadingSkeleton,
   PaginationPlaceholder,
   StatCard,
   StatusBadge,
@@ -266,9 +267,7 @@ export default function AdminDashboardPage() {
         >
           {isPlatformAdmin ? (
             adminLoading ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                Loading chart...
-              </div>
+              <LoadingSkeleton />
             ) : (
               <DashboardTrendChart
                 points={trendPoints}
@@ -279,9 +278,7 @@ export default function AdminDashboardPage() {
               />
             )
           ) : loading ? (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Loading chart...
-            </div>
+            <LoadingSkeleton />
           ) : (
             <DashboardTrendChart
               points={trendPoints}
@@ -369,7 +366,7 @@ export default function AdminDashboardPage() {
           >
             {recentBookings.map((booking) => (
               <tr key={booking.id}>
-                <td className="px-4 py-4 text-sm font-bold text-slate-950">
+                <td className="px-4 py-4 text-sm font-semibold text-slate-950">
                   {"bookingRef" in booking ? booking.bookingRef : booking.booking_reference ?? "N/A"}
                 </td>
                 <td className="px-4 py-4 text-sm text-slate-600">
@@ -384,7 +381,7 @@ export default function AdminDashboardPage() {
                 <td className="px-4 py-4">
                   <StatusBadge value={booking.status ?? "Unknown"} />
                 </td>
-                <td className="px-4 py-4 text-sm font-bold text-slate-950">
+                <td className="px-4 py-4 text-sm font-semibold text-slate-950">
                   {"amount" in booking
                     ? booking.amount
                     : formatMoney(
@@ -406,14 +403,10 @@ export default function AdminDashboardPage() {
         >
           <div className="space-y-4">
             {isPlatformAdmin && adminLoading ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                Loading recent activity...
-              </div>
+              <LoadingSkeleton />
             ) : null}
             {!isPlatformAdmin && loading ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                Loading recent activity...
-              </div>
+              <LoadingSkeleton />
             ) : null}
             {isPlatformAdmin && adminError ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
@@ -429,14 +422,14 @@ export default function AdminDashboardPage() {
               <div key={activity.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-extrabold text-slate-950">
+                    <h3 className="text-sm font-semibold text-slate-950">
                       {"detail" in activity ? activity.title : activity.title}
                     </h3>
                     <p className="mt-1 text-sm leading-6 text-slate-600">
                       {"detail" in activity ? activity.detail : activity.description ?? activity.action}
                     </p>
                   </div>
-                  <span className="shrink-0 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+                  <span className="shrink-0 text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
                     {"time" in activity ? activity.time : formatRelativeTime(activity.created_at)}
                   </span>
                 </div>
@@ -524,10 +517,10 @@ function SnapshotRow({
         <Icon className="h-5 w-5" />
       </div>
       <div className="min-w-0">
-        <div className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+        <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
           {label}
         </div>
-        <div className="mt-1 text-sm font-extrabold text-slate-950">{value}</div>
+        <div className="mt-1 text-sm font-semibold text-slate-950">{value}</div>
       </div>
     </div>
   );
@@ -618,7 +611,7 @@ function DashboardTrendChart({
         <div className="mt-3 grid grid-cols-7 gap-2 text-center">
           {points.map((point) => (
             <div key={point.date}>
-              <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
+              <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
                 {point.label}
               </div>
               <div className="mt-1 text-sm font-semibold text-slate-900">{point.bookings}</div>
@@ -633,10 +626,10 @@ function DashboardTrendChart({
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+      <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
         {label}
       </div>
-      <div className="mt-2 text-lg font-extrabold text-slate-950">{value}</div>
+      <div className="mt-2 text-lg font-semibold text-slate-950">{value}</div>
     </div>
   );
 }

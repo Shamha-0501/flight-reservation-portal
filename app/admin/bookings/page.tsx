@@ -8,6 +8,7 @@ import {
   AdminPage,
   EmptyState,
   FilterSelect,
+  LoadingSkeleton,
   KebabMenu,
   PaginationPlaceholder,
   SearchInput,
@@ -103,6 +104,7 @@ export default function AdminBookingsPage() {
               "All Statuses",
               "Booked",
               "Cancellation Requested",
+              "Rescheduled",
               "Cancelled",
               "Refunded",
             ]}
@@ -119,9 +121,7 @@ export default function AdminBookingsPage() {
 
         <div className="mt-5">
           {loading ? (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Loading bookings...
-            </div>
+            <LoadingSkeleton />
           ) : error ? (
             <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
               {error}

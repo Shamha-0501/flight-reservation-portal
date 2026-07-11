@@ -3,22 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Bell, ChevronDown, LogOut, Menu, User, X } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Menu, Plane, User, X } from "lucide-react";
 import { useAuth } from "@/src/shared/auth/AuthProvider";
 import { useAppDispatch } from "@/src/shared/redux/store/hooks";
 import { logout } from "@/src/shared/redux/store/authSlice";
 import { adminNavItems } from "./adminRoutes";
 import { AuthAlert } from "../auth/AuthScaffold";
-
-function LoadingScreen() {
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50">
-      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-600 shadow-sm">
-        Loading dashboard...
-      </div>
-    </main>
-  );
-}
+import { RouteLoadingScreen } from "../common/RouteLoadingScreen";
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -132,13 +123,21 @@ export function AdminShell({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  if (loading || !isAuthenticated) return <LoadingScreen />;
+  if (loading || !isAuthenticated) {
+    return (
+      <RouteLoadingScreen
+        title="Loading dashboard"
+        description="Preparing the admin workspace and permissions."
+        variant="compact"
+      />
+    );
+  }
 
   if (access.kind === "blocked") {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
         <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-950">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
             Workspace pending approval
           </h1>
           <p className="mt-3 text-sm leading-6 text-slate-600">
@@ -152,7 +151,15 @@ export function AdminShell({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!isAdmin) return <LoadingScreen />;
+  if (!isAdmin) {
+    return (
+      <RouteLoadingScreen
+        title="Redirecting"
+        description="This account is being routed to the correct workspace."
+        variant="compact"
+      />
+    );
+  }
 
   const userInitial = user?.name?.charAt(0)?.toUpperCase() ?? "A";
 
@@ -173,10 +180,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
       >
         <div className="flex h-16 items-center justify-between border-b border-slate-200 px-5">
           <Link href="/admin/dashboard" className="min-w-0">
-            <div className="text-sm font-extrabold tracking-tight text-slate-950">
+            <div className="text-sm font-semibold tracking-tight text-slate-950">
               Flight <span className="text-blue-600">Portal</span>
             </div>
-            <div className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+            <div className="mt-0.5 truncate text-xs font-medium text-slate-500">
               Admin Workspace
             </div>
           </Link>
@@ -200,7 +207,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 key={item.href}
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold transition ${
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
                   active
                     ? "bg-blue-50 text-blue-700"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
@@ -215,13 +222,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
         <div className="border-t border-slate-200 p-4">
           <div className="rounded-2xl bg-slate-50 p-3">
-            <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
               Active workspace
             </div>
-            <div className="truncate text-sm font-extrabold text-slate-950">
+            <div className="truncate text-sm font-semibold text-slate-950">
               {workspaceLabel}
             </div>
-            <div className="mt-1 truncate text-xs font-semibold text-slate-500">
+            <div className="mt-1 truncate text-xs font-medium text-slate-500">
               {roleLabel}
             </div>
           </div>
@@ -241,8 +248,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </button>
 
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-extrabold text-slate-950">{workspaceLabel}</div>
-              <div className="truncate text-xs font-semibold text-slate-500">
+              <div className="truncate text-sm font-semibold text-slate-950">{workspaceLabel}</div>
+              <div className="truncate text-xs font-medium text-slate-500">
                 {activeRoute?.title ?? "Admin"} · {roleLabel}
               </div>
             </div>
@@ -259,10 +266,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <div className="relative" ref={profileRef}>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
                   onClick={() => setProfileOpen((value) => !value)}
                 >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-extrabold text-white">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
                     {userInitial}
                   </span>
                   <span className="hidden max-w-40 truncate sm:block">
@@ -274,13 +281,21 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 {profileOpen ? (
                   <div className="absolute right-0 top-full z-30 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
                     <div className="border-b border-slate-100 px-4 py-3">
-                      <div className="truncate text-sm font-extrabold text-slate-950">
+                      <div className="truncate text-sm font-semibold text-slate-950">
                         {user?.name ?? "Admin"}
                       </div>
                       <div className="mt-0.5 truncate text-xs font-medium text-slate-500">
                         {user?.email ?? workspaceLabel}
                       </div>
                     </div>
+                    <Link
+                      href="/bookings"
+                      className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      onClick={() => setProfileOpen(false)}
+                    >
+                      <Plane className="h-4 w-4" />
+                      Bookings
+                    </Link>
                     <Link
                       href="/profile"
                       className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -300,7 +315,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
                   </div>
                 ) : null}
               </div>
-
             </div>
           </div>
         </header>

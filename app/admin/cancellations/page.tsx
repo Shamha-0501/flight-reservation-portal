@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { confirmOrderRefund } from "@/src/api/routes/orders/cancellation";
+import {
+  approveOrderCancellationWorkflow,
+  confirmOrderRefund,
+  rejectOrderCancellationWorkflow,
+} from "@/src/api/routes/orders/cancellation";
 import { fetchBookings, type BookingListItem } from "@/src/api/routes/orders/bookings";
 import { getTenantCustomers, type TenantCustomer } from "@/src/api/routes/tenant/customers";
 import { useAuth } from "@/src/shared/auth/AuthProvider";
@@ -10,6 +14,7 @@ import {
   Drawer,
   EmptyState,
   FilterSelect,
+  LoadingSkeleton,
   KebabMenu,
   SearchInput,
   StatusBadge,
@@ -20,6 +25,7 @@ import {
 export default function AdminCancellationsPage() {
   const { selectedTenant } = useAuth();
   const tenantKey = selectedTenant?.key ?? "";
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState("All Statuses");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
   const [dateFilter, setDateFilter] = useState("All Dates");
   const [search, setSearch] = useState("");
@@ -29,6 +35,8 @@ export default function AdminCancellationsPage() {
   const [loading, setLoading] = useState(false);
   const [customersLoading, setCustomersLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [approvalActionKey, setApprovalActionKey] = useState<string | null>(null);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
 
   async function loadCancellationData(currentTenantKey: string) {
     const [bookingsResponse, customersResponse] = await Promise.all([
@@ -114,7 +122,90 @@ export default function AdminCancellationsPage() {
     });
   }, [dateFilter, rows, statusFilter]);
 
+  const approvalRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const monthStart = getMonthStart();
+
+    return rows.filter((row) => {
+      const approvalState = getCancellationApprovalState(row);
+      const requestedAt =
+        row.meta?.cancellation?.requested_at ??
+        null;
+      const reviewedAt =
+        row.meta?.cancellation?.approved_at ??
+        row.meta?.cancellation?.rejected_at ??
+        null;
+      const searchText = [
+        row.booking_reference,
+        row.user?.name,
+        row.user?.email,
+        row.duffel_order_id,
+        approvalState,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const matchesStatus =
+        approvalStatusFilter === "All Statuses" ||
+        (approvalStatusFilter === "Cancellation Requested" &&
+          approvalState === "requested") ||
+        (approvalStatusFilter === "Approved" && approvalState === "approved") ||
+        (approvalStatusFilter === "Rejected" && approvalState === "rejected");
+      const isCancellationRequested = approvalState === "requested";
+      const matchesDate =
+        dateFilter === "All Dates" ||
+        (dateFilter === "This Month" &&
+          ((typeof requestedAt === "string" && requestedAt >= monthStart) ||
+            (typeof reviewedAt === "string" && reviewedAt >= monthStart))) ||
+        (dateFilter === "Older" &&
+          (!requestedAt || requestedAt < monthStart) &&
+          (!reviewedAt || reviewedAt < monthStart));
+
+      return (
+        isCancellationRequested &&
+        matchesStatus &&
+        matchesDate &&
+        (!query || searchText.includes(query))
+      );
+    });
+  }, [approvalStatusFilter, dateFilter, rows, search]);
+
   const selected = rows.find((item) => item.id === selectedId) ?? null;
+
+  async function handleCancellationApprovalAction(
+    row: BookingListItem,
+    action: "approve" | "reject"
+  ) {
+    if (!tenantKey) {
+      setApprovalError("Tenant key is missing.");
+      return;
+    }
+
+    const actionId = `${row.id}:${action}`;
+    setApprovalActionKey(actionId);
+    setApprovalError(null);
+
+    try {
+      if (action === "approve") {
+        await approveOrderCancellationWorkflow({ orderId: row.id, tenantKey });
+      } else {
+        await rejectOrderCancellationWorkflow({
+          orderId: row.id,
+          tenantKey,
+          reason: "Rejected by tenant admin.",
+        });
+      }
+
+      await loadCancellationData(tenantKey);
+    } catch (requestError) {
+      setApprovalError(
+        requestError instanceof Error ? requestError.message : "Failed to update cancellation approval."
+      );
+    } finally {
+      setApprovalActionKey(null);
+    }
+  }
 
   async function handleConfirmRefund(orderId: number) {
     if (!tenantKey) return;
@@ -133,7 +224,119 @@ export default function AdminCancellationsPage() {
       description={`Manage cancellations and refunds for ${selectedTenant?.name ?? "this tenant"} using tenant order records.`}
     >
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_320px]">
-        <SurfaceCard title="Refund desk" description="Review tenant cancellation and refund states.">
+        <div className="space-y-5">
+          <SurfaceCard
+            title="Cancellation approvals"
+            description="Review customer cancellation requests and approve or reject them before the refund desk updates."
+          >
+            <div className="grid gap-3 lg:grid-cols-[180px_180px_minmax(0,1fr)]">
+              <FilterSelect
+                value={approvalStatusFilter}
+                onChange={setApprovalStatusFilter}
+                options={["All Statuses", "Cancellation Requested", "Approved", "Rejected"]}
+              />
+              <FilterSelect
+                value={dateFilter}
+                onChange={setDateFilter}
+                options={["All Dates", "This Month", "Older"]}
+              />
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search booking reference or customer"
+              />
+            </div>
+
+            {approvalError ? (
+              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                {approvalError}
+              </div>
+            ) : null}
+
+            <div className="mt-5">
+              {loading ? (
+                <LoadingSkeleton />
+              ) : approvalRows.length === 0 ? (
+                <EmptyState
+                  title="No cancellation approvals"
+                  description="Customer cancellation requests will appear here before refund confirmation runs."
+                />
+              ) : (
+                <TableShell
+                  columns={[
+                    "Booking Ref",
+                    "Customer",
+                    "Request Status",
+                    "Requested At",
+                    "Reviewed At",
+                    "Actions",
+                  ]}
+                >
+                  {approvalRows.map((row) => {
+                    const approvalState = getCancellationApprovalState(row);
+                    const isReviewed = approvalState === "approved" || approvalState === "rejected";
+                    return (
+                      <tr key={row.id}>
+                        <td className="px-4 py-4 text-sm font-semibold text-slate-950">
+                          {row.booking_reference ?? "N/A"}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-slate-600">
+                          {row.user?.name ?? row.user?.email ?? "Guest"}
+                        </td>
+                        <td className="px-4 py-4">
+                          <StatusBadge
+                            value={
+                              approvalState === "approved"
+                                ? "Approved"
+                                : approvalState === "rejected"
+                                  ? "Rejected"
+                                  : row.cancellation_status ?? "Not Cancelled"
+                            }
+                          />
+                        </td>
+                        <td className="px-4 py-4 text-sm text-slate-600">
+                          {getCancellationWorkflowDate(row, "requested")}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-slate-600">
+                          {getCancellationWorkflowDate(row, "reviewed")}
+                        </td>
+                        <td className="px-4 py-4">
+                          {isReviewed ? (
+                            <StatusBadge value={approvalState === "approved" ? "Approved" : "Rejected"} />
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void handleCancellationApprovalAction(row, "approve")}
+                                disabled={approvalActionKey === `${row.id}:approve`}
+                                className="inline-flex h-9 items-center justify-center rounded-xl bg-emerald-600 px-3.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {approvalActionKey === `${row.id}:approve`
+                                  ? "Approving..."
+                                  : "Approve"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleCancellationApprovalAction(row, "reject")}
+                                disabled={approvalActionKey === `${row.id}:reject`}
+                                className="inline-flex h-9 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-3.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {approvalActionKey === `${row.id}:reject`
+                                  ? "Rejecting..."
+                                  : "Reject"}
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </TableShell>
+              )}
+            </div>
+          </SurfaceCard>
+
+          <SurfaceCard title="Refund desk" description="Review tenant cancellation and refund states.">
           <div className="grid gap-3 lg:grid-cols-[180px_180px_minmax(0,1fr)]">
             <FilterSelect
               value={statusFilter}
@@ -154,9 +357,7 @@ export default function AdminCancellationsPage() {
 
           <div className="mt-5">
             {loading ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                Loading cancellation requests...
-              </div>
+              <LoadingSkeleton />
             ) : error ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
                 {error}
@@ -180,13 +381,13 @@ export default function AdminCancellationsPage() {
               >
                 {filteredRows.map((row) => (
                   <tr key={row.id}>
-                    <td className="px-4 py-4 text-sm font-bold text-slate-950">
+                    <td className="px-4 py-4 text-sm font-semibold text-slate-950">
                       {row.booking_reference ?? "N/A"}
                     </td>
                     <td className="px-4 py-4 text-sm text-slate-600">
                       {row.user?.name ?? row.user?.email ?? "Guest"}
                     </td>
-                    <td className="px-4 py-4 text-sm font-bold text-slate-950">
+                    <td className="px-4 py-4 text-sm font-semibold text-slate-950">
                       {formatMoney(
                         row.meta?.cancellation?.refund_amount,
                         row.meta?.cancellation?.refund_currency,
@@ -215,15 +416,14 @@ export default function AdminCancellationsPage() {
             )}
           </div>
         </SurfaceCard>
+        </div>
 
         <SurfaceCard
           title="Customers"
           description="Tenant customers with booking activity connected to cancellations."
         >
           {customersLoading ? (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Loading customers...
-            </div>
+            <LoadingSkeleton />
           ) : customers.length === 0 ? (
             <EmptyState
               title="No customers found"
@@ -235,7 +435,7 @@ export default function AdminCancellationsPage() {
                 <div key={customer.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-extrabold text-slate-950">{customer.name}</h3>
+                      <h3 className="text-sm font-semibold text-slate-950">{customer.name}</h3>
                       <p className="mt-1 text-sm text-slate-600">{customer.email}</p>
                       <p className="mt-1 text-xs text-slate-500">
                         {customer.total_bookings} bookings, {customer.cancelled_bookings} cancelled
@@ -293,7 +493,7 @@ function InfoGrid({ rows }: { rows: [string, string][] }) {
     <div className="grid gap-3 sm:grid-cols-2">
       {rows.map(([label, value]) => (
         <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <div className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+          <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
             {label}
           </div>
           <div className="mt-2 text-sm font-semibold text-slate-900">{value}</div>
@@ -305,6 +505,32 @@ function InfoGrid({ rows }: { rows: [string, string][] }) {
 
 function getCancellationCurrentStatus(booking: BookingListItem) {
   return booking.cancellation_status ?? "Not Cancelled";
+}
+
+function getCancellationApprovalState(booking: BookingListItem) {
+  const cancellation = booking.meta?.cancellation ?? null;
+  const approvedAt = typeof cancellation?.approved_at === "string" ? cancellation.approved_at : null;
+  const rejectedAt = typeof cancellation?.rejected_at === "string" ? cancellation.rejected_at : null;
+  const status = normalizeStatus(booking.cancellation_status);
+
+  if (approvedAt) return "approved";
+  if (rejectedAt) return "rejected";
+  if (status === "cancellation requested") return "requested";
+  return status || "unknown";
+}
+
+function getCancellationWorkflowDate(booking: BookingListItem, kind: "requested" | "reviewed") {
+  const field =
+    kind === "requested"
+      ? booking.meta?.cancellation?.requested_at
+      : booking.meta?.cancellation?.approved_at ?? booking.meta?.cancellation?.rejected_at;
+
+  if (field) return field.slice(0, 10);
+  return "N/A";
+}
+
+function normalizeStatus(value?: string | null) {
+  return (value ?? "").toLowerCase().trim();
 }
 
 function getCancellationDate(booking: BookingListItem) {

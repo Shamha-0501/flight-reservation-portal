@@ -6,6 +6,7 @@ import { useAuth } from "@/src/shared/auth/AuthProvider";
 import {
   AdminPage,
   EmptyState,
+  LoadingSkeleton,
   SearchInput,
   StatusBadge,
   SurfaceCard,
@@ -73,9 +74,7 @@ export default function AdminCustomersPage() {
         </div>
 
         {loading ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            Loading customers...
-          </div>
+          <LoadingSkeleton />
         ) : error ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
             {error}
@@ -100,7 +99,7 @@ export default function AdminCustomersPage() {
           >
             {customers.map((customer) => (
               <tr key={customer.id}>
-                <td className="px-4 py-4 text-sm font-bold text-slate-950">{customer.name}</td>
+                <td className="px-4 py-4 text-sm font-semibold text-slate-950">{customer.name}</td>
                 <td className="px-4 py-4 text-sm text-slate-600">{customer.email}</td>
                 <td className="px-4 py-4 text-sm text-slate-600">{customer.phone ?? "-"}</td>
                 <td className="px-4 py-4 text-sm text-slate-600">{customer.total_bookings}</td>

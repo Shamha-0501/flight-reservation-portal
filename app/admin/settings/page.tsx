@@ -6,6 +6,7 @@ import {
   AdminButton,
   AdminPage,
   FilterSelect,
+  LoadingSkeleton,
   SurfaceCard,
 } from "@/src/shared/components/admin/AdminUI";
 import {
@@ -201,6 +202,7 @@ export default function AdminSettingsPage() {
         title={isPlatformAdmin ? "Portal information" : "Tenant information"}
         description={loading ? "Loading saved settings from the backend..." : undefined}
       >
+        {loading ? <LoadingSkeleton /> : null}
         <div className="grid gap-4 md:grid-cols-2">
           <TextField
             label={isPlatformAdmin ? "Platform Name" : "Company Name"}
@@ -223,7 +225,7 @@ export default function AdminSettingsPage() {
             onChange={(value) => setSettings((current) => ({ ...current, location: value }))}
           />
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Timezone</label>
+            <label className="text-sm font-medium text-slate-700">Timezone</label>
             <FilterSelect
               value={settings.timezone}
               onChange={(value) => setSettings((current) => ({ ...current, timezone: value }))}
@@ -232,7 +234,7 @@ export default function AdminSettingsPage() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Currency</label>
+            <label className="text-sm font-medium text-slate-700">Currency</label>
             <FilterSelect
               value={settings.currency}
               onChange={(value) => setSettings((current) => ({ ...current, currency: value }))}
@@ -246,7 +248,7 @@ export default function AdminSettingsPage() {
       <div className="grid gap-5 xl:grid-cols-2">
         <SurfaceCard title={isPlatformAdmin ? "Brand theme" : "Theme"}>
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">
+            <label className="text-sm font-medium text-slate-700">
               {isPlatformAdmin ? "Platform theme" : "Portal theme"}
             </label>
             <FilterSelect
@@ -312,7 +314,7 @@ function TextField({
 }) {
   return (
     <div className="space-y-2">
-      <label className="text-sm font-bold text-slate-700">{label}</label>
+      <label className="text-sm font-medium text-slate-700">{label}</label>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}

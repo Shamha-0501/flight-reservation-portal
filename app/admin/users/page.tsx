@@ -204,7 +204,7 @@ export default function AdminUsersPage() {
                 return (
                   <tr key={member.id}>
                     <td className="px-4 py-4">
-                      <div className="text-sm font-bold text-slate-950">
+                      <div className="text-sm font-semibold text-slate-950">
                         {member.name ?? "Unnamed member"}
                       </div>
                     </td>
@@ -275,11 +275,11 @@ export default function AdminUsersPage() {
                   placeholder="member@example.com"
                 />
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Role</label>
+                  <label className="text-sm font-medium text-slate-700">Role</label>
                   <FilterSelect value={role} onChange={setRole} options={[...roleOptions]} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Workspace access</label>
+                  <label className="text-sm font-medium text-slate-700">Workspace access</label>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                     {role === "tenant_owner" || role === "tenant_admin"
                       ? "Can manage users, bookings, and workspace settings."
@@ -316,7 +316,7 @@ export default function AdminUsersPage() {
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                          <div className="text-sm font-bold text-slate-950">{invitation.email}</div>
+                          <div className="text-sm font-semibold text-slate-950">{invitation.email}</div>
                           <div className="mt-1 text-sm text-slate-600">
                             {invitation.role ?? invitation.role_key ?? "Member"} ·{" "}
                             {normalizeStatus(invitation.status)}
@@ -381,7 +381,7 @@ function Field({
 }) {
   return (
     <div className="space-y-2">
-      <label className="text-sm font-bold text-slate-700">{label}</label>
+      <label className="text-sm font-medium text-slate-700">{label}</label>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}

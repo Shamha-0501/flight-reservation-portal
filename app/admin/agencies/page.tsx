@@ -142,7 +142,7 @@ export default function AdminAgenciesPage() {
                   <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-3">
-                        <h2 className="text-lg font-extrabold tracking-tight text-slate-950">
+                        <h2 className="text-lg font-semibold tracking-tight text-slate-950">
                           {tenant.name}
                         </h2>
                         <StatusBadge value={formatStatus(tenant.status)} />
@@ -204,7 +204,7 @@ export default function AdminAgenciesPage() {
                 <SurfaceCard key={tenant.id} className="h-full">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-4">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-lg font-extrabold text-blue-700">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-lg font-semibold text-blue-700">
                         {tenant.name
                           .split(" ")
                           .map((part) => part[0])
@@ -212,7 +212,7 @@ export default function AdminAgenciesPage() {
                           .slice(0, 2)}
                       </div>
                       <div>
-                        <h2 className="text-lg font-extrabold tracking-tight text-slate-950">
+                        <h2 className="text-lg font-semibold tracking-tight text-slate-950">
                           {tenant.name}
                         </h2>
                         <p className="mt-1 text-sm text-slate-500">{tenant.key}</p>
@@ -232,7 +232,7 @@ export default function AdminAgenciesPage() {
                   </div>
 
                   <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                    <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
                       Industry
                     </div>
                     <div className="mt-2 text-sm font-semibold text-slate-900">{industry}</div>
@@ -255,7 +255,7 @@ export default function AdminAgenciesPage() {
 function AgencyMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+      <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
         {label}
       </div>
       <div className="mt-2 text-sm font-semibold text-slate-900">{value}</div>
@@ -285,8 +285,8 @@ function SummaryCard({
 
   return (
     <div className={`rounded-2xl border p-5 shadow-sm ${toneClass}`}>
-      <div className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{label}</div>
-      <div className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950">{value}</div>
+      <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</div>
+      <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{value}</div>
     </div>
   );
 }

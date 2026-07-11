@@ -20,10 +20,10 @@ export function AdminPageCard({
               <Icon className="h-6 w-6" />
             </div>
             <div className="min-w-0">
-              <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-100">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">
                 Admin
               </div>
-              <h1 className="mt-2 text-3xl font-extrabold tracking-tight">
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight">
                 {title}
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-100">
@@ -35,7 +35,7 @@ export function AdminPageCard({
       </section>
 
       <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-extrabold tracking-tight text-slate-950">
+        <h2 className="text-lg font-semibold tracking-tight text-slate-950">
           {title}
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
@@ -45,7 +45,7 @@ export function AdminPageCard({
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
             <Icon className="h-6 w-6" />
           </div>
-          <h3 className="mt-4 text-base font-extrabold text-slate-950">
+          <h3 className="mt-4 text-base font-semibold text-slate-950">
             Admin tools coming soon
           </h3>
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
