@@ -3,6 +3,13 @@ import { http } from "../../config/http";
 export type BookingListItem = {
   id: number;
   tenant_id: number;
+  tenant_key?: string | null;
+  tenant_name?: string | null;
+  tenant?: {
+    id?: number | null;
+    key?: string | null;
+    name?: string | null;
+  } | null;
   duffel_order_id?: string | null;
   booking_reference?: string | null;
   status?: string | null;
@@ -36,13 +43,45 @@ export type BookingListItem = {
   meta?: {
     offer?: Record<string, unknown> | null;
     duffel_order?: Record<string, unknown> | null;
+    change?: {
+      status?: string | null;
+      request_id?: string | null;
+      order_change_id?: string | null;
+      selected_order_change_offer?: string | null;
+      requested_at?: string | null;
+      change_created_at?: string | null;
+      approved_at?: string | null;
+      approved_by?: string | number | null;
+      approval_note?: string | null;
+      rejected_at?: string | null;
+      rejected_by?: string | number | null;
+      rejection_reason?: string | null;
+      confirmed_at?: string | null;
+      request_payload?: Record<string, unknown> | null;
+      request_response?: Record<string, unknown> | null;
+      change_response?: Record<string, unknown> | null;
+      confirm_response?: Record<string, unknown> | null;
+      previous_order_snapshot?: Record<string, unknown> | null;
+      latest_order_snapshot?: Record<string, unknown> | null;
+      payment_difference?: string | number | null;
+      refund_amount?: string | number | null;
+      additional_payment_amount?: string | number | null;
+    } | null;
     cancellation?: {
+      status?: string | null;
       cancellation_id?: string | null;
+      requested_at?: string | null;
       refund_amount?: string | number | null;
       refund_currency?: string | null;
       cancellation_fee?: string | number | null;
       cancellation_fee_currency?: string | null;
       expires_at?: string | null;
+      approved_at?: string | null;
+      approved_by?: string | number | null;
+      approval_note?: string | null;
+      rejected_at?: string | null;
+      rejected_by?: string | number | null;
+      rejection_reason?: string | null;
       confirmed_at?: string | null;
       refund_confirmed_at?: string | null;
       warnings?: string[] | null;
@@ -67,7 +106,7 @@ type BookingListResponse = {
 };
 
 export async function fetchBookings(params: {
-  tenantKey: string;
+  tenantKey?: string;
   email?: string;
   search?: string;
   status?: string;

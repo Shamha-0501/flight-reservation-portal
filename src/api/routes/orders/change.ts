@@ -59,6 +59,14 @@ export type OrderChangeResponse = {
   summary?: OrderChangeSummary;
 };
 
+export type OrderWorkflowActionResponse = {
+  message?: string;
+  order_id?: number | string;
+  status?: string | null;
+  change_status?: string | null;
+  order?: Record<string, unknown>;
+};
+
 export async function getOrderChangeableStatus(orderId: string | number) {
   try {
     const response = await http.get<OrderChangeabilityResponse>(
@@ -85,9 +93,13 @@ export async function createOrderChangeRequest(payload: {
   };
 }) {
   try {
+    const requestPayload = {
+      ...payload,
+      order_id: String(payload.order_id),
+    };
     const response = await http.post<OrderChangeRequestResponse>(
       "/api/order-change-requests",
-      payload
+      requestPayload
     );
     return response.data;
   } catch (error: unknown) {
@@ -128,9 +140,13 @@ export async function createOrderChange(payload: {
   selected_order_change_offer: string;
 }) {
   try {
+    const requestPayload = {
+      ...payload,
+      order_id: String(payload.order_id),
+    };
     const response = await http.post<OrderChangeResponse>(
       "/api/order-changes",
-      payload
+      requestPayload
     );
     return response.data;
   } catch (error: unknown) {
@@ -159,17 +175,60 @@ export async function confirmOrderChange(params: {
   payment?: Record<string, unknown>;
 }) {
   try {
+    const requestBody = {
+      order_id: String(params.orderId),
+      payment: params.payment,
+    };
     const response = await http.post<OrderChangeResponse>(
       `/api/order-changes/${params.orderChangeId}/confirm`,
-      {
-        order_id: params.orderId,
-        payment: params.payment,
-      }
+      requestBody
     );
     return response.data;
   } catch (error: unknown) {
     throw new Error(
       getApiErrorMessage(error, "Failed to confirm order change.")
+    );
+  }
+}
+
+export async function approveOrderChangeWorkflow(params: {
+  orderId: string | number;
+  tenantKey?: string;
+  note?: string;
+}) {
+  try {
+    const response = await http.post<OrderWorkflowActionResponse>(
+      `/api/orders/${params.orderId}/change/approve`,
+      {
+        tenantKey: params.tenantKey,
+        note: params.note,
+      }
+    );
+    return response.data;
+  } catch (error: unknown) {
+    throw new Error(
+      getApiErrorMessage(error, "Failed to approve order change.")
+    );
+  }
+}
+
+export async function rejectOrderChangeWorkflow(params: {
+  orderId: string | number;
+  tenantKey?: string;
+  reason?: string;
+}) {
+  try {
+    const response = await http.post<OrderWorkflowActionResponse>(
+      `/api/orders/${params.orderId}/change/reject`,
+      {
+        tenantKey: params.tenantKey,
+        reason: params.reason,
+      }
+    );
+    return response.data;
+  } catch (error: unknown) {
+    throw new Error(
+      getApiErrorMessage(error, "Failed to reject order change.")
     );
   }
 }

@@ -14,6 +14,11 @@ export type TenantAgency = {
     industry?: string;
     [key: string]: unknown;
   } | null;
+  markup?: {
+    type?: "fixed" | "percentage";
+    value?: number;
+    currency?: string;
+  } | null;
   trial_ends_at?: string | null;
   suspended_at?: string | null;
   created_at?: string | null;

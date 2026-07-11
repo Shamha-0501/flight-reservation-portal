@@ -33,6 +33,14 @@ export type OrderCancellationResponse = {
   [key: string]: unknown;
 };
 
+export type OrderWorkflowActionResponse = {
+  message?: string;
+  order_id?: number | string;
+  status?: string | null;
+  cancellation_status?: string | null;
+  order?: Record<string, unknown>;
+};
+
 export async function getOrderRefundableStatus(orderId: string | number) {
   try {
     const response = await http.get<OrderRefundableStatusResponse>(
@@ -117,6 +125,48 @@ export async function confirmOrderRefund(params: {
   } catch (error: unknown) {
     throw new Error(
       getApiErrorMessage(error, "Failed to confirm refund.")
+    );
+  }
+}
+
+export async function approveOrderCancellationWorkflow(params: {
+  orderId: string | number;
+  tenantKey?: string;
+  note?: string;
+}) {
+  try {
+    const response = await http.post<OrderWorkflowActionResponse>(
+      `/api/orders/${params.orderId}/cancellation/approve`,
+      {
+        tenantKey: params.tenantKey,
+        note: params.note,
+      }
+    );
+    return response.data;
+  } catch (error: unknown) {
+    throw new Error(
+      getApiErrorMessage(error, "Failed to approve cancellation.")
+    );
+  }
+}
+
+export async function rejectOrderCancellationWorkflow(params: {
+  orderId: string | number;
+  tenantKey?: string;
+  reason?: string;
+}) {
+  try {
+    const response = await http.post<OrderWorkflowActionResponse>(
+      `/api/orders/${params.orderId}/cancellation/reject`,
+      {
+        tenantKey: params.tenantKey,
+        reason: params.reason,
+      }
+    );
+    return response.data;
+  } catch (error: unknown) {
+    throw new Error(
+      getApiErrorMessage(error, "Failed to reject cancellation.")
     );
   }
 }

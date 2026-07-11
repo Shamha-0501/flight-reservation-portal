@@ -65,11 +65,31 @@ export type OrderAddonPayload = {
   currency?: string;
 };
 
+export type OrderAgencyMarkupPayload = {
+  enabled: boolean;
+  mode: "percentage" | "fixed";
+  value: number;
+  amount: number;
+  currency: string;
+  label?: string | null;
+};
+
+export type BookingAddonSnapshot = {
+  addon_id: number;
+  addon_code: string;
+  addon_name: string;
+  price: number;
+  currency: string;
+  meta?: Record<string, unknown> | null;
+};
+
 export type CreateOrderRequestBody = {
   tenantKey: string;
   offer_id: string;
   passengers: OrderPassengerPayload[];
   addons?: OrderAddonPayload;
+  booking_addons?: BookingAddonSnapshot[];
+  agency_markup?: OrderAgencyMarkupPayload | null;
   contact_email?: string;
 };
 
@@ -87,6 +107,8 @@ export function buildCreateOrderRequestBody(
   offerId: string,
   passengers: OrderPassengerPayload[],
   addons?: OrderAddonPayload,
+  bookingAddons?: BookingAddonSnapshot[],
+  agencyMarkup?: OrderAgencyMarkupPayload | null,
   contactEmail?: string
 ): CreateOrderRequestBody {
   return {
@@ -94,6 +116,8 @@ export function buildCreateOrderRequestBody(
     offer_id: offerId,
     passengers,
     ...(addons ? { addons } : {}),
+    ...(bookingAddons?.length ? { booking_addons: bookingAddons } : {}),
+    ...(agencyMarkup ? { agency_markup: agencyMarkup } : {}),
     ...(contactEmail ? { contact_email: contactEmail } : {}),
   };
 }
