@@ -33,7 +33,7 @@ export default function HeroSection() {
       </div>
 
        {/* SEARCH BAR – CENTERED */}
-  <div className="absolute left-1/2 top-[68%] z-20 w-full -translate-x-1/2 -translate-y-1/2 px-6">
+  <div id="search" className="absolute left-1/2 top-[68%] z-20 w-full -translate-x-1/2 -translate-y-1/2 px-6">
     <div className="mx-auto max-w-7xl">
       <SearchFlightsBar />
     </div>

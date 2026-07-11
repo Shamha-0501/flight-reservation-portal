@@ -8,6 +8,7 @@ import GetAFreeQuote from "@/src/shared/components/home/quote";
 import WhatTravelersSay from "@/src/shared/components/home/tesimonials";
 import TrendingDestinations from "@/src/shared/components/home/trending";
 import Why from "@/src/shared/components/home/why";
+import Footer from "@/src/shared/components/home/Footer";
 import Container from "@/src/shared/ui/Container";
 
 
@@ -24,6 +25,7 @@ export default function Home() {
       <WhatTravelersSay />
       {/* <ChooseYourPerfectJourney />
       <GetAFreeQuote /> */}
+      <Footer />
     </main>
   );
 }
