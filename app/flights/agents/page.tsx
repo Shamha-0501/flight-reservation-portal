@@ -6,16 +6,11 @@ import { useSearchParams } from "next/navigation";
 import Container from "@/src/shared/ui/Container";
 import FlightDetailsSidebar from "@/src/shared/components/booking/FlightDetailsSidebar";
 import { getActiveAgencies, type TenantAgency } from "@/src/api/routes/tenant/agencies";
-import { getTenantAddonSettings } from "@/src/api/routes/tenant/extras";
 import { getFlightOfferDetails } from "@/src/api/routes/flightSearch/search";
 import {
   mapDuffelOfferToBookingViewModel,
 } from "@/src/shared/lib/flightsData";
-import {
-  mapTenantSettingsToAddons,
-  mapTenantSettingsToPolicies,
-  type TenantAddonSettings,
-} from "@/src/shared/lib/tenantAddonSettings";
+import { LoadingSkeleton } from "@/src/shared/components/admin/AdminUI";
 
 type DuffelPlace = {
   iata_code?: string;
@@ -56,6 +51,12 @@ type DuffelOffer = Record<string, unknown> & {
   total_currency?: string | null;
 };
 
+type AgencyMarkupSettings = Record<string, unknown> & {
+  markup_type?: "fixed" | "percentage" | null;
+  markup_value: number;
+  currency?: string | null;
+};
+
 type AgentPageFlight = {
   title: string;
   meta: string;
@@ -69,7 +70,7 @@ type AgentPageFlight = {
     segments: SidebarSegment[];
   };
   includedBaggage: string;
-  basePrice: number | null;
+  basePrice: number;
   currency: string;
 };
 
@@ -98,7 +99,7 @@ const FALLBACK_FLIGHT: AgentPageFlight = {
     segments: [],
   },
   includedBaggage: "Baggage details will be confirmed during booking.",
-  basePrice: null,
+  basePrice: 0,
   currency: "USD",
 };
 
@@ -111,14 +112,7 @@ export default function AgentsPage() {
 
   const [agencies, setAgencies] = useState<TenantAgency[]>([]);
   const [loadingAgencies, setLoadingAgencies] = useState(false);
-  const [loadingExtras, setLoadingExtras] = useState(false);
   const [agenciesError, setAgenciesError] = useState<string | null>(null);
-  const [extrasByAgencyKey, setExtrasByAgencyKey] = useState<
-    Record<string, TenantAddonSettings | null>
-  >({});
-  const [extrasErrorsByAgencyKey, setExtrasErrorsByAgencyKey] = useState<
-    Record<string, string>
-  >({});
   const [selectedOffer, setSelectedOffer] = useState<DuffelOffer | null>(null);
   const [loadingFlight, setLoadingFlight] = useState(false);
   const [flightError, setFlightError] = useState<string | null>(null);
@@ -186,8 +180,6 @@ export default function AgentsPage() {
     async function run() {
       setLoadingAgencies(true);
       setAgenciesError(null);
-      setExtrasByAgencyKey({});
-      setExtrasErrorsByAgencyKey({});
 
       try {
         const activeAgencies = await getActiveAgencies();
@@ -195,44 +187,6 @@ export default function AgentsPage() {
         if (cancelled) return;
 
         setAgencies(activeAgencies);
-        setLoadingAgencies(false);
-
-        if (!activeAgencies.length) {
-          return;
-        }
-
-        setLoadingExtras(true);
-
-        const extrasResults = await Promise.all(
-          activeAgencies.map(async (agency) => {
-            try {
-              const settings = await getTenantAddonSettings(agency.key);
-              return { agencyKey: agency.key, settings, error: null };
-            } catch (error: unknown) {
-              return {
-                agencyKey: agency.key,
-                settings: null,
-                error: getErrorMessage(error, "Failed to load agency extras."),
-              };
-            }
-          })
-        );
-
-        if (cancelled) return;
-
-        const nextExtrasByAgencyKey: Record<string, TenantAddonSettings | null> = {};
-        const nextExtrasErrorsByAgencyKey: Record<string, string> = {};
-
-        extrasResults.forEach((result) => {
-          nextExtrasByAgencyKey[result.agencyKey] = result.settings;
-
-          if (result.error) {
-            nextExtrasErrorsByAgencyKey[result.agencyKey] = result.error;
-          }
-        });
-
-        setExtrasByAgencyKey(nextExtrasByAgencyKey);
-        setExtrasErrorsByAgencyKey(nextExtrasErrorsByAgencyKey);
       } catch (error: unknown) {
         if (!cancelled) {
           setAgencies([]);
@@ -241,7 +195,6 @@ export default function AgentsPage() {
       } finally {
         if (!cancelled) {
           setLoadingAgencies(false);
-          setLoadingExtras(false);
         }
       }
     }
@@ -293,9 +246,7 @@ export default function AgentsPage() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-4">
             {loadingFlight ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
-                Loading selected flight...
-              </div>
+              <LoadingSkeleton />
             ) : null}
 
             {flightError ? (
@@ -311,9 +262,7 @@ export default function AgentsPage() {
             ) : null}
 
             {loadingAgencies ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
-                Loading agencies...
-              </div>
+              <LoadingSkeleton />
             ) : null}
 
             {agenciesError ? (
@@ -330,10 +279,6 @@ export default function AgentsPage() {
 
             <div className="grid gap-4">
               {agencies.map((agency) => {
-                const settings = extrasByAgencyKey[agency.key];
-                const extrasError = extrasErrorsByAgencyKey[agency.key];
-                const extrasPreview = getAgencyExtrasPreview(settings);
-
                 return (
                   <div
                     key={agency.key}
@@ -355,40 +300,20 @@ export default function AgentsPage() {
                         </div>
 
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {loadingExtras && !settings && !extrasError ? (
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                              Loading extras
-                            </span>
-                          ) : extrasError ? (
-                            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                              Extras unavailable
-                            </span>
-                          ) : extrasPreview.length ? (
-                            extrasPreview.slice(0, 4).map((extra) => (
-                              <span
-                                key={extra}
-                                className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700"
-                              >
-                                {extra}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                              No agency extras configured
-                            </span>
-                          )}
-
-                          {extrasPreview.length > 4 ? (
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                              +{extrasPreview.length - 4} more
-                            </span>
-                          ) : null}
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                            Add-ons shown during booking
+                          </span>
                         </div>
                       </div>
 
                       <div className="shrink-0 sm:text-right">
                         <div className="text-lg font-bold text-slate-900">
-                          {formatMoneyValue(flight.basePrice, flight.currency)}
+                          {flight.basePrice === null
+                            ? formatMoneyValue(null, flight.currency)
+                            : formatMoneyValue(
+                                flight.basePrice * ((Number(agency.markup?.value ?? 0) + 100) / 100),
+                                flight.currency
+                              )}
                         </div>
                         <div className="mt-1 text-xs text-slate-500">
                           Flight fare before optional extras
@@ -444,7 +369,12 @@ function buildAgentPageFlight(offer: DuffelOffer | null): AgentPageFlight {
   const destinationName =
     getPlaceName(firstSlice?.destination) || viewModel.summary.route;
   const currency = offer.total_currency || "USD";
-  const basePrice = toNumberOrNull(offer.total_amount);
+  const rawBasePrice = offer.total_amount;
+  const basePrice = typeof rawBasePrice === "number"
+    ? rawBasePrice
+    : typeof rawBasePrice === "string"
+    ? Number(rawBasePrice)
+    : 0;
 
   return {
     title: destinationName,
@@ -453,7 +383,7 @@ function buildAgentPageFlight(offer: DuffelOffer | null): AgentPageFlight {
     outbound: buildSliceDetails(slices[0], viewModel.summary.travelDate),
     inbound: buildSliceDetails(slices[1], "Not included"),
     includedBaggage: viewModel.baggageLabel.replace(/^Included baggage:\s*/i, ""),
-    basePrice,
+    basePrice: Number.isFinite(basePrice) ? basePrice : 0,
     currency,
   };
 }
@@ -487,17 +417,6 @@ function buildSliceDetails(
       };
     }),
   };
-}
-
-function getAgencyExtrasPreview(settings?: TenantAddonSettings | null) {
-  if (!settings) return [];
-
-  return [
-    ...mapTenantSettingsToPolicies(settings).flatMap((group) =>
-      group.upgrades.map((upgrade) => upgrade.label)
-    ),
-    ...mapTenantSettingsToAddons(settings).map((addon) => addon.title),
-  ];
 }
 
 function getPlaceName(place?: DuffelPlace) {

@@ -147,19 +147,26 @@ export default function FlightsPage() {
 
   const handleAllowOneStop = () => {
     setUiFilters((prev) => {
-      const nextStops = Array.from(new Set([...(prev.stops ?? []), "1"]));
+      const currentStops = prev.stops ?? ([] as Array<"0" | "1" | "2plus">);
+      const nextStops: Array<"0" | "1" | "2plus"> = currentStops.includes("1")
+        ? currentStops
+        : ([...currentStops, "1"] as Array<"0" | "1" | "2plus">);
       return {
         ...prev,
         stops: nextStops,
       };
     });
     setAppliedFilters((prev) => {
-      const nextStops = Array.from(new Set([...(prev.stops ?? []), "1"])).filter(
-        (stop) => stop !== "0"
-      ) as Array<"0" | "1" | "2plus">;
+      const currentStops = prev.stops ?? ([] as Array<"0" | "1" | "2plus">);
+      const nextStops: Array<"0" | "1" | "2plus"> = currentStops.includes("1")
+        ? currentStops
+        : ([...currentStops, "1"] as Array<"0" | "1" | "2plus">);
+      const filteredStops = nextStops.filter(
+        (stop): stop is "1" | "2plus" => stop !== "0"
+      );
       return {
         ...prev,
-        stops: nextStops,
+        stops: filteredStops,
       };
     });
     setCurrentPage(1);
@@ -339,6 +346,7 @@ export default function FlightsPage() {
       <div className="mx-auto w-full max-w-screen-2xl px-4 py-8 sm:px-6">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
           <FlightsFilters
+            loading={loading}
             meta={meta}
             uiFilters={uiFilters}
             setUiFilters={setUiFilters}

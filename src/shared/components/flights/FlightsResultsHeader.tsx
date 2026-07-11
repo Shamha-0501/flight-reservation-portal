@@ -27,6 +27,22 @@ export default function FlightsResultsHeader({
   resultCount,
   hasSearch,
 }: Props) {
+  if (loading) {
+    return (
+      <div className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-slate-50 to-blue-50/40 px-6 py-5 shadow-[0_8px_30px_rgba(37,99,235,0.08)]">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/70 to-transparent" />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 space-y-3">
+            <div className="h-3 w-24 animate-pulse rounded-full bg-blue-100" />
+            <div className="h-10 w-72 max-w-full animate-pulse rounded-full bg-slate-200" />
+            <div className="h-4 w-80 max-w-full animate-pulse rounded-full bg-slate-100" />
+          </div>
+          <div className="h-10 w-36 animate-pulse rounded-xl border border-blue-100 bg-white" />
+        </div>
+      </div>
+    );
+  }
+
   let title = "Flight results";
   let subtitle = "Refine your search to find the best option.";
 
@@ -54,7 +70,7 @@ export default function FlightsResultsHeader({
             Flight results
           </div>
 
-          <div className="mt-1 text-[34px] font-extrabold leading-tight tracking-tight text-slate-900">
+          <div className="mt-1 text-[34px] font-semibold leading-tight tracking-tight text-slate-900">
             {title}
           </div>
 

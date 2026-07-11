@@ -27,7 +27,7 @@ export default function FeaturesSection() {
         <div className="px-6">
           {/* Title */}
           <div className="text-center">
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+            <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-gray-900 dark:text-white">
               Why Choose FlightPortal?
             </h2>
 

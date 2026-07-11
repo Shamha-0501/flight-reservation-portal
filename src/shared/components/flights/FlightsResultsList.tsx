@@ -42,7 +42,21 @@ export default function FlightsResultsList({
 
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100">
-      {loading && <div className="text-sm text-slate-600">Loading...</div>}
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="h-4 w-28 animate-pulse rounded-full bg-slate-200" />
+              <div className="mt-3 h-5 w-2/3 animate-pulse rounded-full bg-slate-200" />
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                <div className="h-9 animate-pulse rounded-xl bg-white" />
+                <div className="h-9 animate-pulse rounded-xl bg-white" />
+                <div className="h-9 animate-pulse rounded-xl bg-white" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {!loading && !error && data && data.length > 0 && (
         <div className="space-y-5">

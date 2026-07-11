@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 type Props = {
+  loading: boolean;
   meta: any | null;
   uiFilters: FlightSearchAppliedFilters;
   setUiFilters: React.Dispatch<React.SetStateAction<FlightSearchAppliedFilters>>;
@@ -119,6 +120,7 @@ function formatCurrency(value: number | undefined, currency = "EUR") {
 }
 
 export default function FlightsFilters({
+  loading,
   meta,
   uiFilters,
   setUiFilters,
@@ -205,6 +207,10 @@ export default function FlightsFilters({
 
   const visibleAirlines = showAllAirlines ? filteredAirlines : filteredAirlines.slice(0, 6);
   const isNonStopSelected = Boolean(uiFilters.stops?.includes("0"));
+
+  if (loading) {
+    return <FlightsFiltersSkeleton />;
+  }
 
   const sliderTrackLeft =
     priceRangeMax > priceRangeMin
@@ -600,6 +606,51 @@ export default function FlightsFilters({
     <div className="text-sm text-slate-400">No transit airport data available</div>
   )}
 </FilterSection>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function FlightsFiltersSkeleton() {
+  return (
+    <aside className="lg:sticky lg:top-4 lg:self-start">
+      <div className="scrollbar-hide rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-200" />
+              <div className="space-y-2">
+                <div className="h-4 w-20 animate-pulse rounded-full bg-slate-200" />
+                <div className="h-3 w-28 animate-pulse rounded-full bg-slate-100" />
+              </div>
+            </div>
+            <div className="h-6 w-16 animate-pulse rounded-full bg-slate-100" />
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="h-9 animate-pulse rounded-xl bg-white" />
+            <div className="h-9 animate-pulse rounded-xl bg-blue-200/70" />
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-5">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="border-t border-slate-100 pt-4 first:border-t-0 first:pt-0">
+              <div className="flex items-center justify-between rounded-2xl px-1 py-1">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 animate-pulse rounded-xl bg-slate-100" />
+                  <div className="h-4 w-24 animate-pulse rounded-full bg-slate-200" />
+                </div>
+                <div className="h-4 w-4 animate-pulse rounded-full bg-slate-100" />
+              </div>
+              <div className="mt-3 space-y-2">
+                <div className="h-10 animate-pulse rounded-2xl bg-slate-50" />
+                <div className="h-10 animate-pulse rounded-2xl bg-slate-50" />
+                <div className="h-10 animate-pulse rounded-2xl bg-slate-50" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </aside>
