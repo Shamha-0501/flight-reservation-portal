@@ -49,12 +49,25 @@ function formatDate(value?: string | null): string {
   });
 }
 
+function getAgencyLabel(item: BookingListItem) {
+  return (
+    item.tenant?.name?.trim() ||
+    item.tenant_name?.trim() ||
+    item.tenant_key?.trim() ||
+    (item.tenant_id ? `Agency #${item.tenant_id}` : "") ||
+    "Agency unavailable"
+  );
+}
+
 function normalizeStatus(value?: string | null) {
   return (value ?? "").toLowerCase().trim();
 }
 
 function getBookingDisplayState(item: BookingListItem) {
-  const cancellationStatus = normalizeStatus(item.cancellation_status);
+  const rescheduleStatus = normalizeStatus(
+    item.meta?.change?.status
+  );
+  const cancellationStatus = normalizeStatus(item.meta?.cancellation?.status);
   const refundStatus = normalizeStatus(item.refund_status);
   const status = normalizeStatus(item.status);
 
@@ -80,6 +93,30 @@ function getBookingDisplayState(item: BookingListItem) {
 
   if (cancellationStatus === "cancellation requested" || status === "cancellation requested") {
     return { key: "cancellation-requested", label: "Cancellation Requested" };
+  }
+
+  if (cancellationStatus === "approved") {
+    return { key: "cancellation-approved", label: "Cancellation Approved" };
+  }
+
+  if (cancellationStatus === "rejected") {
+    return { key: "cancellation-rejected", label: "Cancellation Not Permitted" };
+  }
+
+  if (rescheduleStatus === "requested") {
+    return { key: "reschedule-requested", label: "Reschedule Requested" };
+  }
+
+  if (rescheduleStatus === "approved") {
+    return { key: "reschedule-approved", label: "Reschedule Approved" };
+  }
+
+  if (rescheduleStatus === "rejected") {
+    return { key: "reschedule-rejected", label: "Reschedule Not Permitted" };
+  }
+
+  if (status === "rescheduled" || status === "changed") {
+    return { key: "rescheduled", label: "Rescheduled" };
   }
 
   if (status === "created" || status === "booked" || status === "confirmed") {
@@ -108,8 +145,19 @@ function StatusChip({ item }: { item: BookingListItem }) {
         ? "border-rose-200 bg-rose-50 text-rose-700"
         : display.key === "refunded"
           ? "border-sky-200 bg-sky-50 text-sky-700"
-          : display.key === "pending" || display.key === "cancellation-requested"
+      : display.key === "rescheduled"
+            ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+          : display.key === "pending" ||
+              display.key === "cancellation-requested" ||
+              display.key === "reschedule-requested" ||
+              display.key === "reschedule-approved"
             ? "border-amber-200 bg-amber-50 text-amber-700"
+            : display.key === "cancellation-approved"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : display.key === "reschedule-rejected"
+              ? "border-rose-200 bg-rose-50 text-rose-700"
+              : display.key === "cancellation-rejected"
+                ? "border-rose-200 bg-rose-50 text-rose-700"
             : "border-slate-200 bg-slate-50 text-slate-700";
 
   return (
@@ -122,6 +170,12 @@ function StatusChip({ item }: { item: BookingListItem }) {
 function BookingCard({ item }: { item: BookingListItem }) {
   const reference = item.booking_reference || item.duffel_order_id || "-";
   const total = formatMoney(item.amounts?.total?.amount, item.amounts?.total?.currency);
+  const agencyLabel = getAgencyLabel(item);
+  const detailsHref = item.tenant_key
+    ? `/bookings/${item.id}?tenantKey=${encodeURIComponent(item.tenant_key)}`
+    : item.tenant?.key
+      ? `/bookings/${item.id}?tenantKey=${encodeURIComponent(item.tenant.key)}`
+      : `/bookings/${item.id}`;
 
   return (
     <article className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_18px_46px_rgba(15,23,42,0.08)]">
@@ -165,13 +219,16 @@ function BookingCard({ item }: { item: BookingListItem }) {
           </div>
 
           <div className="mt-4 grid gap-2 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2 text-blue-700">
+              <span className="font-semibold text-blue-900">Booked via:</span> {agencyLabel}
+            </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <span className="font-semibold text-slate-900">Created:</span> {formatDate(item.created_at)}
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <span className="font-semibold text-slate-900">Void window:</span> {formatDate(item.void_window_ends_at)}
             </div>
-            <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2 text-blue-700">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               Secure booking record
             </div>
           </div>
@@ -179,7 +236,7 @@ function BookingCard({ item }: { item: BookingListItem }) {
 
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col">
           <Link
-            href={`/bookings/${item.id}`}
+            href={detailsHref}
             className="inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-bold text-white shadow-[0_10px_24px_rgba(37,99,235,0.20)] transition hover:-translate-y-0.5 hover:bg-blue-700"
           >
             View details
@@ -210,9 +267,10 @@ function BookingsSkeleton() {
 
 export default function BookingsPage() {
   const authUser = useSelector((s: RootState) => s.auth.user);
-  const tenantBootstrap = useSelector((s: RootState) => s.tenantBootstrap.tenant);
+  const authStatus = useSelector((s: RootState) => s.auth.authStatus);
+  const meChecked = useSelector((s: RootState) => s.auth.meChecked);
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<BookingListItem[]>([]);
   const [page, setPage] = useState(1);
@@ -221,22 +279,22 @@ export default function BookingsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const tenantKey = useMemo(
-    () =>
-      tenantBootstrap?.key ??
-      authUser?.tenant_key ??
-      authUser?.tenants?.[0]?.key ??
-      "",
-    [authUser?.tenant_key, authUser?.tenants, tenantBootstrap?.key]
-  );
   const email = authUser?.email ?? "";
+  const authIsReady = authStatus !== "unknown" && meChecked;
 
   useEffect(() => {
-    if (!tenantKey) {
+    if (!authIsReady) {
+      return;
+    }
+
+    if (!email) {
       setError(
-        "No tenant workspace is linked to this account yet. Booking history will appear here once a tenant context is available.",
+        authStatus === "guest"
+          ? "Please sign in to view your booking history."
+          : "Your account email is missing, so booking history cannot be loaded.",
       );
       setItems([]);
+      setLoading(false);
       return;
     }
 
@@ -248,7 +306,6 @@ export default function BookingsPage() {
 
       try {
         const result = await fetchBookings({
-          tenantKey,
           email: email || undefined,
           page,
         });
@@ -274,7 +331,7 @@ export default function BookingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [email, page, tenantKey]);
+  }, [authIsReady, authStatus, email, page]);
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -330,7 +387,7 @@ export default function BookingsPage() {
             <div>
               <h2 className="text-lg font-extrabold tracking-tight text-slate-950">Your reservations</h2>
               <p className="mt-1 text-sm text-slate-500">
-                {loading ? "Loading bookings..." : `${filteredItems.length} of ${total} booking(s) shown`}
+                {loading ? "Fetching bookings..." : `${filteredItems.length} of ${total} booking(s) shown`}
               </p>
             </div>
 
@@ -353,8 +410,12 @@ export default function BookingsPage() {
                 <option value="all">All statuses</option>
                 <option value="booked">Booked</option>
                 <option value="cancellation-requested">Cancellation Requested</option>
+                <option value="reschedule-requested">Reschedule Requested</option>
+                <option value="reschedule-approved">Reschedule Approved</option>
+                <option value="reschedule-rejected">Reschedule Not Permitted</option>
                 <option value="pending">Pending</option>
                 <option value="cancelled">Cancelled</option>
+                <option value="rescheduled">Rescheduled</option>
                 <option value="refund-pending">Cancelled · Refund Pending</option>
                 <option value="cancelled-no-refund">Cancelled · No Refund</option>
                 <option value="refund-unknown">Cancelled · Refund Unknown</option>

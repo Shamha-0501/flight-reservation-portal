@@ -7,8 +7,13 @@ import PolicyOptionsSection from "./components/PolicyOptionsSection";
 import AddonsSection from "./components/AddonsSection";
 import type { OrderAddonPayload } from "@/src/api/routes/orders/create";
 import {
+  buildBookingAddonSnapshots,
+  mapAgencyAddonsToBookingItems,
+  type AgencyAddonRecord,
+  type BookingAddonSnapshot,
+} from "@/src/shared/lib/agencyAddons";
+import {
   buildAgencyAddonPayload,
-  mapTenantSettingsToAddons,
   mapTenantSettingsToPolicies,
   type TenantAddonSettings,
 } from "../../../lib/tenantAddonSettings";
@@ -55,17 +60,24 @@ export type PolicyGroup = {
 
 export type AddonItem = {
   id: string;
+  code?: string;
   title: string;
   description: string;
   price: string;
   priceAmount?: number;
   tag?: string;
+  addonId?: number;
+  currency?: string;
+  isEnabled?: boolean;
+  finalName?: string;
+  finalDescription?: string;
 };
 
 export type ExtrasOrderSelection = {
   selectedBaggageByTraveller: Record<string, string>;
   selectedPolicyByGroup: Record<string, string | null>;
   selectedAddonIds: string[];
+  bookingAddons: BookingAddonSnapshot[];
   addons: OrderAddonPayload;
   agencyAddonsAmount: number;
   duffelAddonsAmount: number;
@@ -77,6 +89,7 @@ type ExtrasStepProps = {
   baggageSelections: TravellerBaggage[];
   seatSelection: SeatSelectionSummary;
   tenantAddonSettings?: TenantAddonSettings | null;
+  bookingAddons?: AgencyAddonRecord[] | null;
   policies?: PolicyGroup[];
   addons?: AddonItem[];
   initialSelection?: ExtrasOrderSelection | null;
@@ -87,6 +100,7 @@ export default function ExtrasStep({
   baggageSelections,
   seatSelection,
   tenantAddonSettings,
+  bookingAddons,
   policies: fallbackPolicies = [],
   addons: fallbackAddons = [],
   initialSelection,
@@ -101,12 +115,16 @@ export default function ExtrasStep({
   );
 
   const addons = useMemo(
-    () =>
-      tenantAddonSettings
-        ? mapTenantSettingsToAddons(tenantAddonSettings)
-        : fallbackAddons,
-    [tenantAddonSettings, fallbackAddons]
+    () => {
+      if (bookingAddons?.length) {
+        return mapAgencyAddonsToBookingItems(bookingAddons);
+      }
+
+      return fallbackAddons;
+    },
+    [bookingAddons, fallbackAddons]
   );
+  const hasBookingAddons = Boolean(bookingAddons?.length);
 
   const [selectedBaggageByTraveller, setSelectedBaggageByTraveller] = useState<
     Record<string, string>
@@ -141,7 +159,10 @@ export default function ExtrasStep({
     );
   };
 
-  const currency = tenantAddonSettings?.currency || "USD";
+  const currency =
+    bookingAddons?.[0]?.currency ||
+    tenantAddonSettings?.currency ||
+    "USD";
 
   const selectedPolicyIds = useMemo(
     () =>
@@ -184,9 +205,21 @@ export default function ExtrasStep({
     [tenantAddonSettings, selectedPolicyIds, selectedAddonIds]
   );
 
+  const bookingAddonSnapshots = useMemo(
+    () => buildBookingAddonSnapshots(bookingAddons ?? [], selectedAddonIds),
+    [bookingAddons, selectedAddonIds]
+  );
+
+  const bookingAddonAmount = useMemo(
+    () => roundMoney(bookingAddonSnapshots.reduce((total, addon) => total + addon.price, 0)),
+    [bookingAddonSnapshots]
+  );
+
   const orderAddons = useMemo<OrderAddonPayload>(() => {
     const duffelAddonsAmount = roundMoney(duffelBaggageSummary.amount);
-    const agencyAddonsAmount = roundMoney(agencyAddonSummary.amount);
+    const agencyAddonsAmount = hasBookingAddons
+      ? bookingAddonAmount
+      : roundMoney(agencyAddonSummary.amount);
 
     return {
       duffel_baggage_enabled: duffelBaggageSummary.count > 0,
@@ -206,13 +239,14 @@ export default function ExtrasStep({
       total_addons_amount: roundMoney(agencyAddonsAmount + duffelAddonsAmount),
       currency,
     };
-  }, [agencyAddonSummary, currency, duffelBaggageSummary]);
+  }, [agencyAddonSummary, bookingAddonAmount, currency, duffelBaggageSummary, hasBookingAddons]);
 
   useEffect(() => {
     onSelectionChange?.({
       selectedBaggageByTraveller,
       selectedPolicyByGroup,
       selectedAddonIds,
+      bookingAddons: bookingAddonSnapshots,
       addons: orderAddons,
       agencyAddonsAmount: orderAddons.agency_addons_amount ?? 0,
       duffelAddonsAmount: orderAddons.duffel_addons_amount ?? 0,
@@ -226,6 +260,7 @@ export default function ExtrasStep({
     selectedAddonIds,
     selectedBaggageByTraveller,
     selectedPolicyByGroup,
+    bookingAddonSnapshots,
   ]);
 
   return (

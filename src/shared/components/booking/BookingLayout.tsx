@@ -65,8 +65,8 @@ export default function BookingLayout({
             type="button"
             onClick={onNext}
             disabled={!canGoNext}
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-6 text-sm font-bold text-white shadow-[0_10px_24px_rgba(37,99,235,0.24)] transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-[0_14px_30px_rgba(37,99,235,0.30)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
-          >
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-6 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(37,99,235,0.24)] transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-[0_14px_30px_rgba(37,99,235,0.30)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+            >
             Continue
           </button>
         </div>

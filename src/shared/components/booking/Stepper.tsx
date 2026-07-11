@@ -26,14 +26,14 @@ export default function Stepper({
     <nav aria-label="Booking progress" className="relative">
       <div className="mb-3 flex items-center justify-between md:hidden">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-600">
             Step {currentStepIndex + 1} of {steps.length}
           </p>
-          <h2 className="mt-1 text-base font-bold text-slate-950">
+          <h2 className="mt-1 text-base font-semibold text-slate-950">
             {steps[currentStepIndex]?.label}
           </h2>
         </div>
-        <div className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+        <div className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
           {Math.round(progress)}%
         </div>
       </div>
@@ -67,7 +67,7 @@ export default function Stepper({
               >
                 <span
                   className={clsx(
-                    "flex h-10 w-10 items-center justify-center rounded-xl border text-sm font-bold transition-all duration-200",
+                    "flex h-10 w-10 items-center justify-center rounded-xl border text-sm font-semibold transition-all duration-200",
                     isCurrent &&
                       "border-blue-600 bg-blue-600 text-white shadow-[0_10px_24px_rgba(37,99,235,0.28)] ring-4 ring-blue-50",
                     isCompleted &&
@@ -93,7 +93,7 @@ export default function Stepper({
 
                 <span
                   className={clsx(
-                    "mt-3 text-[11px] font-bold uppercase tracking-[0.16em]",
+                    "mt-3 text-[11px] font-semibold uppercase tracking-[0.16em]",
                     isCurrent && "text-blue-600",
                     isCompleted && "text-slate-500",
                     isDisabled && "text-slate-400"

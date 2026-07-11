@@ -9,6 +9,7 @@ type BookingSummarySidebarProps = {
   passengers: string;
   baseFare: string;
   taxes: string;
+  agencyMarkup?: string;
   addonsTotal?: string;
   total: string;
 };
@@ -20,6 +21,7 @@ export default function BookingSummarySidebar({
   passengers,
   baseFare,
   taxes,
+  agencyMarkup = "Included",
   addonsTotal = "Included",
   total,
 }: BookingSummarySidebarProps) {
@@ -29,7 +31,7 @@ export default function BookingSummarySidebar({
         <div className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-100">
           Trip summary
         </div>
-        <div className="mt-2 text-xl font-bold tracking-tight">{route}</div>
+        <div className="mt-2 text-xl font-semibold tracking-tight">{route}</div>
         <div className="mt-1 text-sm text-blue-50">{travelDate}</div>
         <div className="mt-1 text-sm text-blue-100">{passengers}</div>
       </div>
@@ -56,6 +58,11 @@ export default function BookingSummarySidebar({
           </div>
 
           <div className="flex items-center justify-between text-sm text-slate-600">
+            <span>Agency markup</span>
+            <span className="font-medium text-slate-800">{agencyMarkup}</span>
+          </div>
+
+          <div className="flex items-center justify-between text-sm text-slate-600">
             <span>Add-ons</span>
             <span className="font-medium text-slate-800">{addonsTotal}</span>
           </div>
@@ -67,12 +74,12 @@ export default function BookingSummarySidebar({
               <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
                 Total
               </div>
-              <div className="mt-1 text-[28px] font-bold leading-none">
+              <div className="mt-1 text-[28px] font-semibold leading-none">
                 {total}
               </div>
             </div>
             <div className="text-right text-xs text-slate-400">
-              Includes taxes
+              Includes taxes and adjustments
             </div>
           </div>
         </div>

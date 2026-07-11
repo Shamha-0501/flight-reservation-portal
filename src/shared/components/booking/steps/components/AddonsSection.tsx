@@ -25,14 +25,14 @@ export default function AddonsSection({
           Optional services for peace of mind
         </h3>
         <p className="mt-1.5 text-sm text-slate-600">
-          Select platform services offered by this tenant.
+          Select the optional services available for this workspace.
         </p>
       </div>
 
       {addons.length === 0 ? (
         <div className="p-5 sm:p-6">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-            No platform add-ons are available for this tenant.
+            No optional add-ons are available for this workspace.
           </div>
         </div>
       ) : (

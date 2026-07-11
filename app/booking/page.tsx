@@ -9,7 +9,8 @@ import {
   type CreateOrderRequestBody,
   type CreateOrderResponse,
 } from "@/src/api/routes/orders/create";
-import { getTenantAddonSettings } from "@/src/api/routes/tenant/extras";
+import { getBookingAvailableAddons } from "@/src/api/routes/agency/addons";
+import { getBookingMarkupSettings } from "@/src/api/routes/agency/markup";
 import BookingLayout from "@/src/shared/components/booking/BookingLayout";
 import ReviewFlightStep from "@/src/shared/components/booking/steps/ReviewFlightStep";
 import BookingSummarySidebar from "@/src/shared/components/booking/summary/BookingSummarySidebar";
@@ -24,8 +25,15 @@ import ExtrasStep, {
   type TravellerBaggage,
 } from "@/src/shared/components/booking/steps/ExtrasStep";
 import PaymentStep from "@/src/shared/components/booking/steps/PaymentStep";
+import { BookingSectionSkeleton } from "@/src/shared/components/booking/BookingFlowSkeleton";
 import { mapDuffelOfferToBookingViewModel } from "@/src/shared/lib/flightsData";
-import type { TenantAddonSettings } from "@/src/shared/lib/tenantAddonSettings";
+import type { AgencyAddonRecord } from "@/src/shared/lib/agencyAddons";
+import {
+  buildAgencyMarkupSnapshot,
+  calculateAgencyMarkupAmount,
+  normalizeAgencyMarkupSettings,
+  type AgencyMarkupSettings,
+} from "@/src/shared/lib/agencyMarkup";
 import type { DuffelPaymentIntent } from "@/src/api/routes/orders/payment";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "@/src/shared/redux/store";
@@ -234,12 +242,16 @@ export default function BookingPage() {
   const [seatMapStatus, setSeatMapStatus] = useState<string | undefined>();
   const [loadingFlight, setLoadingFlight] = useState(false);
   const [flightError, setFlightError] = useState<string | null>(null);
-  const [tenantAddonSettings, setTenantAddonSettings] =
-    useState<TenantAddonSettings | null>(null);
-  const [loadingTenantSettings, setLoadingTenantSettings] = useState(false);
-  const [tenantSettingsError, setTenantSettingsError] = useState<string | null>(
+  const [bookingAddons, setBookingAddons] = useState<AgencyAddonRecord[] | null>(
     null
   );
+  const [agencyMarkupSettings, setAgencyMarkupSettings] =
+    useState<AgencyMarkupSettings | null>(null);
+  const [loadingAgencyMarkup, setLoadingAgencyMarkup] = useState(false);
+  const [bookingAddonsError, setBookingAddonsError] = useState<string | null>(
+    null
+  );
+  const [agencyMarkupError, setAgencyMarkupError] = useState<string | null>(null);
   const [travellerOrderPayload, setTravellerOrderPayload] =
     useState<TravellerOrderPayload | null>(null);
   const [travellerDraft, setTravellerDraft] =
@@ -275,7 +287,10 @@ export default function BookingPage() {
   const children = Number(searchParams.get("children") || 0);
   const infants = Number(searchParams.get("infants") || 0);
   const extrasCurrency =
-    tenantAddonSettings?.currency || selectedOffer?.total_currency || "USD";
+    selectedOffer?.total_currency ||
+    bookingAddons?.[0]?.currency ||
+    agencyMarkupSettings?.currency ||
+    "USD";
 
   const travellers = useMemo(() => {
     const offerTravellers = buildTravellersFromOfferPassengers(selectedOffer);
@@ -318,13 +333,24 @@ export default function BookingPage() {
     () => parseMoneyAmount(selectedFlight?.fare.total),
     [selectedFlight?.fare.total]
   );
+  const agencyMarkupAmount = useMemo(
+    () => calculateAgencyMarkupAmount(fareTotalAmount ?? 0, agencyMarkupSettings),
+    [agencyMarkupSettings, fareTotalAmount]
+  );
+  const agencyMarkupLabel = useMemo(
+    () =>
+      agencyMarkupAmount > 0
+        ? `${extrasCurrency} ${formatMoneyAmount(agencyMarkupAmount, extrasCurrency)}`
+        : "Included",
+    [agencyMarkupAmount, extrasCurrency]
+  );
   const grandTotalLabel = useMemo(() => {
     if (fareTotalAmount === null) return selectedFlight?.fare.total ?? "-";
     return `${extrasCurrency} ${formatMoneyAmount(
-      fareTotalAmount + selectedAddonsAmount,
+      fareTotalAmount + selectedAddonsAmount + agencyMarkupAmount,
       extrasCurrency
     )}`;
-  }, [extrasCurrency, fareTotalAmount, selectedAddonsAmount, selectedFlight?.fare.total]);
+  }, [agencyMarkupAmount, extrasCurrency, fareTotalAmount, selectedAddonsAmount, selectedFlight?.fare.total]);
   const addonsTotalLabel = useMemo(
     () =>
       selectedAddonsAmount > 0
@@ -394,10 +420,15 @@ export default function BookingPage() {
       offerId,
       travellerOrderPayload.passengers,
       extrasSelection?.addons,
+      extrasSelection?.bookingAddons,
+      buildAgencyMarkupSnapshot(agencyMarkupSettings, fareTotalAmount ?? 0),
       contactEmail
     );
   }, [
+    agencyMarkupSettings,
     extrasSelection?.addons,
+    extrasSelection?.bookingAddons,
+    fareTotalAmount,
     offerId,
     tenantKey,
     travellerOrderPayload,
@@ -555,42 +586,79 @@ export default function BookingPage() {
 
   useEffect(() => {
     if (!tenantKey) {
-      setTenantAddonSettings(null);
-      setTenantSettingsError("Tenant key was not provided.");
+      setBookingAddons(null);
+      setBookingAddonsError(null);
+      setAgencyMarkupSettings(null);
+      setLoadingAgencyMarkup(false);
+      setAgencyMarkupError(null);
+      return;
+    }
+  }, [tenantKey]);
+
+  useEffect(() => {
+    if (!tenantKey) {
       return;
     }
 
     let cancelled = false;
 
     async function run() {
-      setLoadingTenantSettings(true);
-      setTenantSettingsError(null);
+      setLoadingAgencyMarkup(true);
+      setAgencyMarkupError(null);
 
       try {
-        const settings = await getTenantAddonSettings(tenantKey);
+        const payload = await getBookingMarkupSettings(tenantKey);
         if (!cancelled) {
-          setTenantAddonSettings(settings);
+          setAgencyMarkupSettings(
+            payload ? normalizeAgencyMarkupSettings(payload) : null,
+          );
         }
-      } catch (error: unknown) {
+      } catch {
         if (!cancelled) {
-          setTenantAddonSettings(null);
-          setTenantSettingsError(
-            getErrorMessage(error, "Failed to load tenant extras.")
+          setAgencyMarkupSettings(null);
+          setAgencyMarkupError(
+            "We could not load pricing adjustments right now."
           );
         }
       } finally {
         if (!cancelled) {
-          setLoadingTenantSettings(false);
+          setLoadingAgencyMarkup(false);
         }
       }
     }
 
-    run();
+    void run();
 
     return () => {
       cancelled = true;
     };
   }, [tenantKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      try {
+        const addons = await getBookingAvailableAddons(tenantKey);
+        if (!cancelled) {
+          setBookingAddons(addons);
+        }
+      } catch {
+        if (!cancelled) {
+          setBookingAddons(null);
+          setBookingAddonsError(
+            "We could not load optional add-ons right now. The standard options will be used instead."
+          );
+        }
+      }
+    }
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleTravellerPayloadChange = useCallback(
     (payload: TravellerOrderPayload) => {
@@ -665,6 +733,7 @@ export default function BookingPage() {
             passengers={passengersLabel || "-"}
             baseFare={selectedFlight?.fare.baseFare ?? "-"}
             taxes={selectedFlight?.fare.taxes ?? "-"}
+            agencyMarkup={agencyMarkupLabel}
             addonsTotal={addonsTotalLabel}
             total={grandTotalLabel}
           />
@@ -673,9 +742,7 @@ export default function BookingPage() {
         {currentStepIndex === 0 && (
         <>
           {loadingFlight ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
-              Loading selected flight...
-            </div>
+            <BookingSectionSkeleton />
           ) : flightError ? (
             <div
               className={`rounded-2xl border p-6 text-sm ${
@@ -714,15 +781,19 @@ export default function BookingPage() {
 
       {currentStepIndex === 2 && (
         <div className="space-y-4">
-          {loadingTenantSettings ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-              Loading tenant extras...
+          {loadingAgencyMarkup ? (
+            <BookingSectionSkeleton />
+          ) : null}
+
+          {bookingAddonsError ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              {bookingAddonsError}
             </div>
           ) : null}
 
-          {tenantSettingsError ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-              {tenantSettingsError}
+          {agencyMarkupError ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              {agencyMarkupError}
             </div>
           ) : null}
 
@@ -730,7 +801,7 @@ export default function BookingPage() {
             key={`${tenantKey}:${travellerKey}`}
             baggageSelections={baggageSelections}
             seatSelection={seatSelection}
-            tenantAddonSettings={tenantAddonSettings}
+            bookingAddons={bookingAddons}
             initialSelection={extrasSelection}
             onSelectionChange={handleExtrasSelectionChange}
           />
@@ -743,7 +814,7 @@ export default function BookingPage() {
             <div className="text-[12px] font-semibold uppercase tracking-[0.16em] text-blue-600">
               Final review
             </div>
-            <h3 className="mt-1 text-xl font-bold tracking-tight text-slate-950">
+            <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">
               Ready to create order
             </h3>
             <p className="mt-1.5 text-sm text-slate-600">
@@ -752,13 +823,14 @@ export default function BookingPage() {
           </div>
 
           <div className="grid gap-3 p-5 text-sm text-slate-700 sm:p-6">
-            <ReviewRow label="Tenant ID" value={tenantAddonSettings?.tenant_id ?? "-"} />
-            <ReviewRow label="Tenant key" value={tenantKey} />
+            <ReviewRow label="Workspace ID" value={tenantKey || "-"} />
+            <ReviewRow label="Workspace key" value={tenantKey} />
             <ReviewRow label="Offer ID" value={offerId || "-"} />
             <ReviewRow
               label="Passengers"
               value={travellerOrderPayload?.passengers.length ?? 0}
             />
+            <ReviewRow label="Agency markup" value={agencyMarkupLabel} />
             <ReviewRow
               label="Selected add-ons"
               value={`${extrasSelection?.totalAddonsAmount ?? 0} ${extrasSelection?.currency ?? extrasCurrency}`}
@@ -814,7 +886,7 @@ export default function BookingPage() {
               Booking completed
             </div>
 
-            <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-950">
+            <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">
               Order created successfully
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
