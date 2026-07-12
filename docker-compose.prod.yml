@@ -6,11 +6,14 @@ services:
     image: tourism-app:prod
     container_name: tourism-app
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
       PORT: 3000
-      PLATFORM_ROOT_DOMAIN: localhost
+    ports:
+      - "3000:3000"
     expose:
       - "3000"
     networks:
