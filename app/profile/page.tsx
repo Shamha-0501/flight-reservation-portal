@@ -75,13 +75,15 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    if (!isAgencyProfile || !tenant?.key) return;
+    const tenantKey = tenant?.key ?? "";
+
+    if (!isAgencyProfile || !tenantKey) return;
 
     let active = true;
 
     async function loadTenantSettings() {
       try {
-        const payload = await getAdminSettings({ scope: "tenant", tenantKey: tenant.key });
+        const payload = await getAdminSettings({ scope: "tenant", tenantKey });
         if (active) {
           setAgencySettings(payload);
         }

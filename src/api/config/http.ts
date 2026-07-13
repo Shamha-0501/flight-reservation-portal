@@ -1,7 +1,8 @@
 import axios from "axios";
+import { API_ORIGIN } from "./origin";
 
 export const http = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_ORIGIN,
+  baseURL: API_ORIGIN,
   headers: {
     "X-Requested-With": "XMLHttpRequest",
     Accept: "application/json",

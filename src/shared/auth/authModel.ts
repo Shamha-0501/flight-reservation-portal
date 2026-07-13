@@ -12,6 +12,11 @@ export type AuthUser = {
   name: string;
   email: string;
   role?: string | null;
+  phone?: string | null;
+  country?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
+  address?: string | null;
   tenant_id?: number | null;
   tenant_key?: string | null;
   tenants: AuthTenant[];

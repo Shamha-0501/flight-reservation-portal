@@ -44,6 +44,7 @@ export default function MockCardPaymentGate({
   actionLabel = "Validate payment",
   onPaid,
 }: MockCardPaymentGateProps) {
+  const resolvedCurrency = currency ?? "USD";
   const [cardholderName, setCardholderName] = useState("");
   const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
   const [expiryMonth, setExpiryMonth] = useState("");
@@ -84,8 +85,8 @@ export default function MockCardPaymentGate({
       setPaymentError(
         `Payment failed: enter the exact penalty amount of ${formatMoney(
           amountDue,
-          currency
-        )}. Difference: ${formatMoney(difference, currency)}.`
+          resolvedCurrency
+        )}. Difference: ${formatMoney(difference, resolvedCurrency)}.`
       );
       return;
     }
@@ -135,7 +136,7 @@ export default function MockCardPaymentGate({
     try {
       const receipt: MockCardPaymentReceipt = {
         amount: amountDue,
-        currency,
+        currency: resolvedCurrency,
         cardBrand: "Visa",
         cardLast4: "4242",
         paidAt: new Date().toISOString(),
@@ -165,7 +166,7 @@ export default function MockCardPaymentGate({
             Amount due
           </div>
           <div className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950">
-            {amountDue == null ? "-" : formatMoney(amountDue, currency)}
+            {amountDue == null ? "-" : formatMoney(amountDue, resolvedCurrency)}
           </div>
           <div className="mt-1 text-sm text-sky-900">
             Enter the exact penalty amount to pass the mock payment check.

@@ -101,7 +101,9 @@ export default function AdminDashboardPage() {
       };
     }
 
-    if (!selectedTenant?.key) {
+    const tenantKey = selectedTenant?.key ?? "";
+
+    if (!tenantKey) {
       setDashboard(null);
       setActivities([]);
       setError(null);
@@ -117,8 +119,8 @@ export default function AdminDashboardPage() {
 
       try {
         const [dashboardResponse, activitiesResponse] = await Promise.all([
-          getTenantDashboard(selectedTenant.key),
-          getTenantActivities({ tenantKey: selectedTenant.key, per_page: 20 }),
+          getTenantDashboard(tenantKey),
+          getTenantActivities({ tenantKey, per_page: 20 }),
         ]);
 
         if (!active) return;

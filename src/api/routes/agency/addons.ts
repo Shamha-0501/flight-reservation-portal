@@ -32,7 +32,7 @@ export async function updateAgencyAddon(
       payload
     );
     const result = response.data?.data ?? response.data;
-    if (Array.isArray(result) || !result) {
+    if (!isAgencyAddonRecord(result)) {
       throw new Error("The add-on update response was invalid.");
     }
     return result;
@@ -52,7 +52,7 @@ export async function resetAgencyAddon(
       `/api/agency/addons/${addonId}/reset`
     );
     const result = response.data?.data ?? response.data;
-    if (Array.isArray(result) || !result) {
+    if (!isAgencyAddonRecord(result)) {
       throw new Error("The add-on reset response was invalid.");
     }
     return result;
@@ -89,5 +89,23 @@ function getApiErrorMessage(error: unknown, fallback: string) {
     responseError.response?.data?.message ||
     responseError.response?.data?.error ||
     (error instanceof Error ? error.message : fallback)
+  );
+}
+
+function isAgencyAddonRecord(value: unknown): value is AgencyAddonRecord {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const candidate = value as Partial<AgencyAddonRecord>;
+  return (
+    typeof candidate.id === "number" &&
+    typeof candidate.code === "string" &&
+    typeof candidate.default_name === "string" &&
+    typeof candidate.default_description === "string" &&
+    typeof candidate.category === "string" &&
+    typeof candidate.is_active === "boolean" &&
+    typeof candidate.sort_order === "number" &&
+    typeof candidate.is_enabled === "boolean"
   );
 }

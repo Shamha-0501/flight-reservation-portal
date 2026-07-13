@@ -4,6 +4,7 @@ import {
   DuffelPlace,
   mapPlaceToAirportOption,
 } from "@/src/shared/lib/airports";
+import { API_ORIGIN } from "@/src/api/config/origin";
 
 const MIN_QUERY_LENGTH = 3;
 const DEBOUNCE_MS = 300;
@@ -40,8 +41,7 @@ export const useAirport = (query: string) => {
       setError(null);
 
       try {
-        const apiOrigin = process.env.NEXT_PUBLIC_API_ORIGIN;
-        const url = `${apiOrigin}/api/places?q=${encodeURIComponent(debouncedQuery)}`;
+        const url = `${API_ORIGIN}/api/places?q=${encodeURIComponent(debouncedQuery)}`;
 
         const res = await fetch(url, {
           method: "GET",
@@ -71,9 +71,9 @@ export const useAirport = (query: string) => {
           : [];
 
         setAirports(mapped);
-      } catch (err: any) {
-        if (err?.name === "AbortError") return;
-        setError(err as Error);
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setError(err instanceof Error ? err : new Error("Failed to fetch places"));
         setAirports([]);
       } finally {
         setLoading(false);

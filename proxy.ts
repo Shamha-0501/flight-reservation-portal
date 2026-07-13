@@ -15,8 +15,17 @@ function getHostname(req: NextRequest) {
   return host.toLowerCase().split(":")[0];
 }
 
+function isIpAddress(hostname: string) {
+  return /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
+}
+
+function isLocalHost(hostname: string) {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
 function extractSubdomain(hostname: string) {
   if (!ROOT_DOMAIN) return null;
+  if (isIpAddress(hostname) || isLocalHost(hostname)) return null;
   const suffix = "." + ROOT_DOMAIN;
   if (!hostname.endsWith(suffix)) return null;
 

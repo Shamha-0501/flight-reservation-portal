@@ -51,6 +51,14 @@ function formatMoneyDetails(
   }
 }
 
+function toMoneyAmount(value: unknown): string | number | null {
+  return typeof value === "string" || typeof value === "number" ? value : null;
+}
+
+function toMoneyCurrency(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
 function formatDateDetails(value?: string | null): string {
   if (!value) return "-";
   const date = new Date(value);
@@ -64,7 +72,7 @@ function formatDateDetails(value?: string | null): string {
   });
 }
 
-function parseNumericAmount(value?: string | number | null) {
+function parseNumericAmount(value: unknown) {
   if (value == null) return null;
   const numeric =
     typeof value === "number"
@@ -235,23 +243,24 @@ function buildOrderChangeOfferView(
   const origin = (addSlice?.origin as Record<string, unknown> | undefined) ?? null;
   const destination = (addSlice?.destination as Record<string, unknown> | undefined) ?? null;
   const airline = (firstSegment?.operating_carrier as Record<string, unknown> | undefined) ?? null;
-  const currency = String(
+  const currency = toMoneyCurrency(
     rawOffer.additional_payment_currency ??
       rawOffer.refund_currency ??
       rawOffer.change_total_currency ??
-      rawOffer.penalty_total_currency ??
-      fallbackCurrency
+      rawOffer.penalty_total_currency,
+    fallbackCurrency
   );
-  const additionalPaymentAmount = rawOffer.additional_payment_amount ?? null;
-  const refundAmount = rawOffer.refund_amount ?? null;
-  const penaltyAmount = rawOffer.penalty_total_amount ?? rawOffer.penalty_amount ?? null;
-  const newTotalAmount = rawOffer.new_total_amount ?? null;
+  const additionalPaymentAmount = toMoneyAmount(rawOffer.additional_payment_amount);
+  const refundAmount = toMoneyAmount(rawOffer.refund_amount);
+  const penaltyAmount =
+    toMoneyAmount(rawOffer.penalty_total_amount) ?? toMoneyAmount(rawOffer.penalty_amount);
+  const newTotalAmount = toMoneyAmount(rawOffer.new_total_amount);
   const amountValue =
     additionalPaymentAmount ??
     refundAmount ??
     penaltyAmount ??
     newTotalAmount ??
-    rawOffer.change_total_amount ??
+    toMoneyAmount(rawOffer.change_total_amount) ??
     null;
   const amountLabel =
     additionalPaymentAmount != null
@@ -1702,7 +1711,6 @@ export default function BookingDetailsPage() {
                             type="button"
                             onClick={() => {
                               setSelectedChangeOfferId(offerId);
-                              setReschedulePaymentApproved(false);
                             }}
                             aria-pressed={isSelected}
                             className={`rounded-2xl border p-4 text-left transition ${

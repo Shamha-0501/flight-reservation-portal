@@ -14,7 +14,8 @@ export async function getAgencyMarkupSettings(
       params: { tenantKey },
     });
 
-    return response.data?.data ?? response.data ?? null;
+    const result = response.data?.data ?? response.data ?? null;
+    return isAgencyMarkupSettings(result) ? result : null;
   } catch (error: unknown) {
     throw new Error(
       getApiErrorMessage(error, "Failed to load markup settings."),
@@ -30,7 +31,8 @@ export async function getBookingMarkupSettings(
       params: { tenantKey },
     });
 
-    return response.data?.data ?? response.data ?? null;
+    const result = response.data?.data ?? response.data ?? null;
+    return isAgencyMarkupSettings(result) ? result : null;
   } catch (error: unknown) {
     throw new Error(
       getApiErrorMessage(error, "Failed to load markup settings."),
@@ -45,7 +47,7 @@ export async function updateAgencyMarkupSettings(
     await csrf();
     const response = await http.put<AgencyMarkupResponse>("/api/agency/markup", payload);
     const result = response.data?.data ?? response.data;
-    if (!result) {
+    if (!isAgencyMarkupSettings(result)) {
       throw new Error("Markup settings were not returned.");
     }
     return result;
@@ -65,5 +67,19 @@ function getApiErrorMessage(error: unknown, fallback: string) {
     responseError.response?.data?.message ||
     responseError.response?.data?.error ||
     (error instanceof Error ? error.message : fallback)
+  );
+}
+
+function isAgencyMarkupSettings(value: unknown): value is AgencyMarkupSettings {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const candidate = value as Partial<AgencyMarkupSettings>;
+  return (
+    typeof candidate.is_enabled === "boolean" &&
+    typeof candidate.markup_mode === "string" &&
+    typeof candidate.markup_value === "number" &&
+    typeof candidate.currency === "string"
   );
 }
