@@ -133,6 +133,7 @@ export default function FlightsPage() {
       departureTime: {
         ...prev.departureTime,
         outbound: undefined,
+        inbound: undefined,
       },
     }));
     setAppliedFilters((prev) => ({
@@ -140,6 +141,7 @@ export default function FlightsPage() {
       departureTime: {
         ...prev.departureTime,
         outbound: undefined,
+        inbound: undefined,
       },
     }));
     setCurrentPage(1);
@@ -173,7 +175,15 @@ export default function FlightsPage() {
   };
 
   const handleRemoveFilter = (
-    type: "price" | "stop" | "baggage" | "airline" | "layoverAirport",
+    type:
+      | "price"
+      | "stop"
+      | "baggage"
+      | "airline"
+      | "layoverAirport"
+      | "departureTime"
+      | "refundable"
+      | "changeable",
     value?: string
   ) => {
     if (type === "price") {
@@ -230,17 +240,49 @@ export default function FlightsPage() {
       return;
     }
     if (type === "layoverAirport" && value) {
-  setUiFilters((prev) => ({
-    ...prev,
-    layoverAirports: (prev.layoverAirports ?? []).filter((item) => item !== value),
-  }));
-  setAppliedFilters((prev) => ({
-    ...prev,
-    layoverAirports: (prev.layoverAirports ?? []).filter((item) => item !== value),
-  }));
-  setCurrentPage(1);
-  return;
-}
+      setUiFilters((prev) => ({
+        ...prev,
+        layoverAirports: (prev.layoverAirports ?? []).filter((item) => item !== value),
+      }));
+      setAppliedFilters((prev) => ({
+        ...prev,
+        layoverAirports: (prev.layoverAirports ?? []).filter((item) => item !== value),
+      }));
+      setCurrentPage(1);
+      return;
+    }
+
+    if (type === "departureTime") {
+      setUiFilters((prev) => ({
+        ...prev,
+        departureTime: {
+          ...prev.departureTime,
+          [value === "inbound" ? "inbound" : "outbound"]: undefined,
+        },
+      }));
+      setAppliedFilters((prev) => ({
+        ...prev,
+        departureTime: {
+          ...prev.departureTime,
+          [value === "inbound" ? "inbound" : "outbound"]: undefined,
+        },
+      }));
+      setCurrentPage(1);
+      return;
+    }
+
+    if (type === "refundable") {
+      setUiFilters((prev) => ({ ...prev, refundable: undefined }));
+      setAppliedFilters((prev) => ({ ...prev, refundable: undefined }));
+      setCurrentPage(1);
+      return;
+    }
+
+    if (type === "changeable") {
+      setUiFilters((prev) => ({ ...prev, changeable: undefined }));
+      setAppliedFilters((prev) => ({ ...prev, changeable: undefined }));
+      setCurrentPage(1);
+    }
   };
 
   useEffect(() => {

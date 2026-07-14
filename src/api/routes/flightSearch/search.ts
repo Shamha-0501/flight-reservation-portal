@@ -49,9 +49,12 @@ function buildOffersQuery(
   offerRequestId: string,
   filters?: FlightSearchFilters
 ) {
-    const offersQuery: Record<string, unknown> = {
+  const offersQuery: Record<string, unknown> = {
     offer_request_id: offerRequestId,
   };
+
+  const toQueryBoolean = (value?: boolean) =>
+    value == null ? undefined : value ? 1 : 0;
 
   if (filters) {
     if (filters.minPrice != null) offersQuery.minPrice = filters.minPrice;
@@ -74,8 +77,8 @@ function buildOffersQuery(
       offersQuery.avoidLayovers = filters.avoidLayovers;
     if (filters.onlyLayovers?.length)
       offersQuery.onlyLayovers = filters.onlyLayovers;
-    if (filters.refundable != null) offersQuery.refundable = filters.refundable;
-    if (filters.changeable != null) offersQuery.changeable = filters.changeable;
+    if (filters.refundable != null) offersQuery.refundable = toQueryBoolean(filters.refundable);
+    if (filters.changeable != null) offersQuery.changeable = toQueryBoolean(filters.changeable);
     if (filters.minCheckedBags != null)
       offersQuery.minCheckedBags = filters.minCheckedBags;
     if (filters.sortBy) offersQuery.sortBy = filters.sortBy;

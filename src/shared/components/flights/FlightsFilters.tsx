@@ -188,6 +188,11 @@ export default function FlightsFilters({
     count += appliedFilters.baggage?.length ?? 0;
     count += appliedFilters.airlines?.include?.length ?? 0;
     count += appliedFilters.layoverAirports?.length ?? 0;
+    if (appliedFilters.departureTime?.outbound?.min != null || appliedFilters.departureTime?.outbound?.max != null) count += 1;
+    if (appliedFilters.departureTime?.inbound?.min != null || appliedFilters.departureTime?.inbound?.max != null) count += 1;
+    if (appliedFilters.totalDuration?.min != null || appliedFilters.totalDuration?.max != null) count += 1;
+    if (appliedFilters.refundable) count += 1;
+    if (appliedFilters.changeable) count += 1;
 
     return count;
   }, [appliedFilters]);
