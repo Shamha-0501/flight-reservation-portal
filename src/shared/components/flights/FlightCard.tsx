@@ -113,6 +113,18 @@ function formatIsoToPretty(iso?: string) {
   });
 }
 
+function formatDeadlineLabel(iso?: string) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleString([], {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function getCityLabel(
   iata?: string,
   dict?: Record<string, string>,
@@ -462,7 +474,7 @@ export default function FlightCard({ offer, tags = [] }: Props) {
           <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
             <div className="flex flex-wrap gap-2">
               {offer.lastTicketingDate && (
-                <DetailChip>Ticket by {offer.lastTicketingDate}</DetailChip>
+                <DetailChip>Book by {formatDeadlineLabel(offer.lastTicketingDate)}</DetailChip>
               )}
               {computed.refundableAvailable === true && (
                 <DetailChip>Flexible fare</DetailChip>
@@ -547,9 +559,13 @@ export default function FlightCard({ offer, tags = [] }: Props) {
                 <IconCalendar />
                 <div>
                   <div className="text-sm font-semibold text-slate-900">
-                    {refundable}
+                    {offer.lastTicketingDate
+                      ? formatDeadlineLabel(offer.lastTicketingDate)
+                      : refundable}
                   </div>
-                  <div className="text-xs text-slate-500">Fare type</div>
+                  <div className="text-xs text-slate-500">
+                    {offer.lastTicketingDate ? "Ticketing deadline" : "Fare type"}
+                  </div>
                 </div>
               </div>
 
