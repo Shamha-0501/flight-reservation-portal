@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import Container from "@/src/shared/ui/Container";
 import FlightDetailsSidebar from "@/src/shared/components/booking/FlightDetailsSidebar";
 import { getActiveAgencies, type TenantAgency } from "@/src/api/routes/tenant/agencies";
@@ -106,6 +107,7 @@ const FALLBACK_FLIGHT: AgentPageFlight = {
 export default function AgentsPage() {
   const searchParams = useSearchParams();
   const offerId = searchParams.get("offerId") || "";
+  const returnTo = searchParams.get("returnTo") || "/flights";
   const adults = searchParams.get("adults");
   const children = searchParams.get("children");
   const infants = searchParams.get("infants");
@@ -229,8 +231,9 @@ export default function AgentsPage() {
       <div className="bg-[#061b3a] text-white">
         <Container className="mx-auto max-w-6xl px-6 py-8">
           <div className="flex items-center justify-between text-xs uppercase tracking-wide">
-            <Link href="/flights" className="flex items-center gap-2 text-white">
-              <span className="text-base">&larr;</span> Back to results
+            <Link href={returnTo} className="flex items-center gap-2 text-white">
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Back to results</span>
             </Link>
             <div />
             <div />
@@ -381,7 +384,7 @@ function buildAgentPageFlight(offer: DuffelOffer | null): AgentPageFlight {
     meta: `${passengerCount} traveler${passengerCount === 1 ? "" : "s"} - ${tripLabel} - ${viewModel.summary.stops}`,
     summaryRoute: viewModel.summary.route,
     outbound: buildSliceDetails(slices[0], viewModel.summary.travelDate),
-    inbound: buildSliceDetails(slices[1], "Not included"),
+    inbound: buildSliceDetails(slices[1], "No return segment"),
     includedBaggage: viewModel.baggageLabel.replace(/^Included baggage:\s*/i, ""),
     basePrice: Number.isFinite(basePrice) ? basePrice : 0,
     currency,
@@ -393,9 +396,10 @@ function buildSliceDetails(
   fallbackDate: string
 ): AgentPageFlight["outbound"] {
   const segments = Array.isArray(slice?.segments) ? slice.segments : [];
+  const firstSegmentDeparture = segments[0]?.departing_at ?? slice?.departing_at;
 
   return {
-    date: formatDateLabel(slice?.departing_at) || fallbackDate,
+    date: formatDateLabel(firstSegmentDeparture) || fallbackDate,
     segments: segments.map((segment, index) => {
       const carrier =
         segment.marketing_carrier ?? segment.operating_carrier ?? {};

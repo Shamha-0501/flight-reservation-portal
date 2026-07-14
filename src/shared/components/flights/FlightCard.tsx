@@ -274,11 +274,13 @@ export default function FlightCard({ offer, tags = [] }: Props) {
 
   const agentsHref = useMemo(() => {
     const nextParams = new URLSearchParams();
+    const currentUrl = new URLSearchParams(searchParams.toString()).toString();
     const adults = searchParams.get("adults");
     const children = searchParams.get("children");
     const infants = searchParams.get("infants");
 
     if (offer.id) nextParams.set("offerId", offer.id);
+    if (currentUrl) nextParams.set("returnTo", `/flights?${currentUrl}`);
     if (adults) nextParams.set("adults", adults);
     if (children) nextParams.set("children", children);
     if (infants) nextParams.set("infants", infants);
