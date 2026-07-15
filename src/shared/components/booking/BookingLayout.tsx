@@ -29,7 +29,7 @@ export default function BookingLayout({
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.08),transparent_34%),linear-gradient(180deg,#f8fbff_0%,#f8fafc_42%,#ffffff_100%)]">
       <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-screen-2xl px-4 py-4 sm:px-6 lg:px-10">
           <Stepper
             steps={steps}
             currentStepIndex={currentStepIndex}
@@ -38,8 +38,8 @@ export default function BookingLayout({
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-24 lg:pt-8">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_384px]">
+      <div className="mx-auto max-w-screen-2xl px-4 pb-28 pt-6 sm:px-6 lg:px-10 lg:pb-24 lg:pt-8">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_392px]">
           <main className="min-w-0 space-y-5">{children}</main>
 
           <aside className="self-start lg:sticky lg:top-28">{sidebar}</aside>
@@ -47,7 +47,7 @@ export default function BookingLayout({
       </div>
 
       <footer className="sticky bottom-0 z-30 border-t border-slate-200/80 bg-white/95 shadow-[0_-10px_34px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-10">
           <button
             type="button"
             onClick={onBack}

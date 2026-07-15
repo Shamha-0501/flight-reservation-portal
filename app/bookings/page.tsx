@@ -36,6 +36,30 @@ function formatMoney(
   }
 }
 
+function getBookingMoney(order: BookingListItem | null | undefined) {
+  const totals = order?.amounts;
+  const candidates = [
+    totals?.grand_total,
+    totals?.order_total,
+    totals?.total,
+  ];
+
+  const selected = candidates.find(
+    (entry): entry is { amount?: string | number | null; currency?: string | null } =>
+      Boolean(entry && entry.amount != null)
+  );
+
+  return {
+    amount: selected?.amount ?? null,
+    currency:
+      selected?.currency ??
+      totals?.grand_total?.currency ??
+      totals?.order_total?.currency ??
+      totals?.total?.currency ??
+      null,
+  };
+}
+
 function formatDate(value?: string | null): string {
   if (!value) return "-";
   const date = new Date(value);
@@ -170,7 +194,8 @@ function StatusChip({ item }: { item: BookingListItem }) {
 
 function BookingCard({ item }: { item: BookingListItem }) {
   const reference = item.booking_reference || item.duffel_order_id || "-";
-  const total = formatMoney(item.amounts?.total?.amount, item.amounts?.total?.currency);
+  const bookingMoney = getBookingMoney(item);
+  const total = formatMoney(bookingMoney.amount, bookingMoney.currency);
   const agencyLabel = getAgencyLabel(item);
   const detailsHref = item.tenant_key
     ? `/bookings/${item.id}?tenantKey=${encodeURIComponent(item.tenant_key)}`
@@ -368,7 +393,7 @@ export default function BookingsPage() {
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.12),transparent_26%),linear-gradient(180deg,#f9fbff_0%,#f6f8fc_44%,#ffffff_100%)]">
-      <div className="mx-auto w-full max-w-[1180px] px-4 py-5 sm:px-6 lg:py-8">
+      <div className="mx-auto w-full max-w-[1480px] px-4 py-5 sm:px-6 lg:py-8">
         <header className="mb-5 flex items-center justify-between rounded-full border border-white/70 bg-white/75 px-4 py-3 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-black text-white">

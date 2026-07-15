@@ -51,6 +51,30 @@ function formatMoneyDetails(
   }
 }
 
+function getOrderMoney(order?: BookingListItem | null) {
+  const totals = order?.amounts;
+  const candidates = [
+    totals?.grand_total,
+    totals?.order_total,
+    totals?.total,
+  ];
+
+  const selected = candidates.find(
+    (entry): entry is { amount?: string | number | null; currency?: string | null } =>
+      Boolean(entry && entry.amount != null)
+  );
+
+  return {
+    amount: selected?.amount ?? null,
+    currency:
+      selected?.currency ??
+      totals?.grand_total?.currency ??
+      totals?.order_total?.currency ??
+      totals?.total?.currency ??
+      null,
+  };
+}
+
 function toMoneyAmount(value: unknown): string | number | null {
   return typeof value === "string" || typeof value === "number" ? value : null;
 }
@@ -729,8 +753,9 @@ export default function BookingDetailsPage() {
   );
   const reschedulePaymentAmount =
     getOrderChangePaymentAmount(selectedChangeOffer) ?? 0;
+  const orderMoney = getOrderMoney(order);
   const reschedulePaymentCurrency =
-    selectedChangeOffer?.currency || order?.amounts?.total?.currency || "USD";
+    selectedChangeOffer?.currency || orderMoney.currency || "USD";
 
   const tenantKey = useMemo(
     () =>
@@ -803,12 +828,12 @@ export default function BookingDetailsPage() {
     normalizeStatusDetails(order?.cancellation_status) === "cancelled" &&
     normalizeStatusDetails(order?.refund_status) === "refund pending";
 
-  const totalAmount = formatMoneyDetails(order?.amounts?.total?.amount, order?.amounts?.total?.currency);
+  const totalAmount = formatMoneyDetails(orderMoney.amount, orderMoney.currency);
   const refundBeforeDeparture = getRefundBeforeDeparture(refundabilityStatus);
   const penaltyAmount = parseNumericAmount(refundBeforeDeparture?.penalty_amount) ?? 0;
   const penaltyCurrency =
-    refundBeforeDeparture?.penalty_currency || order?.amounts?.total?.currency || "USD";
-  const bookingTotalAmount = parseNumericAmount(order?.amounts?.total?.amount) ?? 0;
+    refundBeforeDeparture?.penalty_currency || orderMoney.currency || "USD";
+  const bookingTotalAmount = parseNumericAmount(orderMoney.amount) ?? 0;
   const cancellationPaymentAmount =
     parseNumericAmount(cancellationQuote?.cancellation_fee) ?? penaltyAmount;
   const cancellationPaymentCurrency =
@@ -1044,7 +1069,7 @@ export default function BookingDetailsPage() {
             orderChangeId,
             payment: buildOrderChangePaymentPayload(
               selectedOffer,
-              order?.amounts?.total?.currency ?? "USD"
+              orderMoney.currency ?? "USD"
             ) ?? undefined,
           })
         : preparedChange;
@@ -1332,7 +1357,7 @@ export default function BookingDetailsPage() {
                     </div>
                     <div className="flex items-center justify-between gap-4 text-slate-600">
                       <span>Currency</span>
-                      <span className="font-bold text-slate-950">{order.amounts?.total?.currency || "-"}</span>
+                      <span className="font-bold text-slate-950">{orderMoney.currency || "-"}</span>
                     </div>
                     <div className="border-t border-slate-200 pt-3">
                       <div className="flex items-center justify-between gap-4">
@@ -1700,7 +1725,7 @@ export default function BookingDetailsPage() {
                       rescheduleOffers.map((offer) => {
                         const offerView = buildOrderChangeOfferView(
                           offer,
-                          order?.amounts?.total?.currency ?? "USD"
+                          orderMoney.currency ?? "USD"
                         );
                         const offerId = offerView.id;
                         const isSelected = selectedChangeOfferId === offerId;
@@ -1894,7 +1919,7 @@ export default function BookingDetailsPage() {
                         label="Estimated refund"
                         value={formatMoneyDetails(
                           estimatedRefundAmount,
-                          order?.amounts?.total?.currency || penaltyCurrency
+                          orderMoney.currency || penaltyCurrency
                         )}
                       />
                     </div>

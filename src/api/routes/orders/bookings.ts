@@ -23,6 +23,14 @@ export type BookingListItem = {
       amount?: string | number | null;
       currency?: string | null;
     };
+    order_total?: {
+      amount?: string | number | null;
+      currency?: string | null;
+    };
+    grand_total?: {
+      amount?: string | number | null;
+      currency?: string | null;
+    };
   };
   user?: {
     email?: string | null;
