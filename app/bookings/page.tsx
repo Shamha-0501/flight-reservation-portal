@@ -394,7 +394,7 @@ export default function BookingsPage() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.12),transparent_26%),linear-gradient(180deg,#f9fbff_0%,#f6f8fc_44%,#ffffff_100%)]">
       <div className="mx-auto w-full max-w-[1480px] px-4 py-5 sm:px-6 lg:py-8">
-        <header className="mb-5 flex items-center justify-between rounded-full border border-white/70 bg-white/75 px-4 py-3 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur">
+        <header className="mb-5 hidden items-center justify-between rounded-full border border-white/70 bg-white/75 px-4 py-3 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-black text-white">
               FP

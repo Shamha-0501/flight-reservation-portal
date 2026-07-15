@@ -75,6 +75,36 @@ function getOrderMoney(order?: BookingListItem | null) {
   };
 }
 
+function getAgencyCharges(order?: BookingListItem | null) {
+  const agencyMarkup = order?.meta?.agency_markup as
+    | { amount?: string | number | null; currency?: string | null }
+    | null
+    | undefined;
+  const addons = Array.isArray(order?.addons) ? order?.addons : [];
+
+  const addonTotal = addons.reduce((sum, addon) => {
+    const record = addon as Record<string, unknown>;
+    const amount =
+      parseNumericAmount(record.agency_addons_amount) ??
+      parseNumericAmount(record.total_addons_amount) ??
+      0;
+    return sum + amount;
+  }, 0);
+
+  const markupAmount = parseNumericAmount(agencyMarkup?.amount) ?? 0;
+  const addonCurrency = addons[0]
+    ? String((addons[0] as Record<string, unknown>).currency ?? "")
+    : "";
+  const currency = (agencyMarkup?.currency ?? addonCurrency) || null;
+
+  const total = markupAmount + addonTotal;
+
+  return {
+    amount: total > 0 ? total : null,
+    currency,
+  };
+}
+
 function toMoneyAmount(value: unknown): string | number | null {
   return typeof value === "string" || typeof value === "number" ? value : null;
 }
@@ -754,6 +784,11 @@ export default function BookingDetailsPage() {
   const reschedulePaymentAmount =
     getOrderChangePaymentAmount(selectedChangeOffer) ?? 0;
   const orderMoney = getOrderMoney(order);
+  const agencyCharges = getAgencyCharges(order);
+  const agencyChargesLabel = formatMoneyDetails(
+    agencyCharges.amount,
+    agencyCharges.currency || orderMoney.currency
+  );
   const reschedulePaymentCurrency =
     selectedChangeOffer?.currency || orderMoney.currency || "USD";
 
@@ -1324,6 +1359,7 @@ export default function BookingDetailsPage() {
                   label="Refund"
                   value={order.refund_status || "-"}
                 />
+                <InfoCardDetails label="Agency charges" value={agencyChargesLabel} />
                 <InfoCardDetails label="Total" value={totalAmount} />
               </section>
 
@@ -1354,6 +1390,10 @@ export default function BookingDetailsPage() {
                     <div className="flex items-center justify-between gap-4 text-slate-600">
                       <span>Booking total</span>
                       <span className="font-bold text-slate-950">{totalAmount}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 text-slate-600">
+                      <span>Agency charges</span>
+                      <span className="font-bold text-slate-950">{agencyChargesLabel}</span>
                     </div>
                     <div className="flex items-center justify-between gap-4 text-slate-600">
                       <span>Currency</span>
