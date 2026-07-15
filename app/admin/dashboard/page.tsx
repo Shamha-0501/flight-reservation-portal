@@ -29,7 +29,6 @@ import {
   AdminPage,
   AdminButton,
   LoadingSkeleton,
-  PaginationPlaceholder,
   StatCard,
   StatusBadge,
   SurfaceCard,
@@ -234,13 +233,14 @@ export default function AdminDashboardPage() {
         },
       ];
   const recentBookings = isPlatformAdmin
-    ? adminDashboard?.recent_bookings ?? bookings.slice(0, 5)
+    ? adminDashboard?.recent_bookings ?? bookings.slice(0, 8)
     : dashboard?.recent_bookings ?? [];
   const recentTenantActivities = isPlatformAdmin
     ? adminActivities.length
       ? adminActivities
       : recentActivity
     : activities;
+  const visibleTenantActivities = recentTenantActivities.slice(0, 10);
   const trendPoints = isPlatformAdmin ? adminDashboard?.trend?.points ?? [] : dashboard?.trend?.points ?? [];
 
   return (
@@ -258,37 +258,22 @@ export default function AdminDashboardPage() {
         </>
       }
     >
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_320px]">
-        <SurfaceCard
-          title="Weekly booking trend"
-          description={
-            isPlatformAdmin
-              ? "Platform trend data comes from the admin dashboard API."
-              : `Last 7 days of booking activity for ${selectedTenant?.name ?? "this tenant"}.`
-          }
-        >
-          {isPlatformAdmin ? (
-            adminLoading ? (
-              <LoadingSkeleton />
-            ) : (
-              <DashboardTrendChart
-                points={trendPoints}
-                revenueLabel={formatMoney(
-                  platformStats?.revenue.amount,
-                  platformStats?.revenue.currency,
-                )}
-              />
-            )
-          ) : loading ? (
-            <LoadingSkeleton />
-          ) : (
-            <DashboardTrendChart
-              points={trendPoints}
-              revenueLabel={formatMoney(tenantStats?.revenue?.amount, tenantStats?.revenue?.currency)}
-            />
-          )}
-        </SurfaceCard>
+      <section className="rounded-[28px] border border-slate-200 bg-white p-3 shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {dashboardStats.map((card, index) => (
+          <StatCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            note={card.note}
+            icon={statIcons[index]?.icon}
+            iconTone={statIcons[index]?.iconTone}
+          />
+        ))}
+        </div>
+      </section>
 
+      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_320px]">
         <SurfaceCard
           title="Operations snapshot"
           description={
@@ -332,20 +317,37 @@ export default function AdminDashboardPage() {
             />
           </div>
         </SurfaceCard>
-      </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {dashboardStats.map((card, index) => (
-          <StatCard
-            key={card.label}
-            label={card.label}
-            value={card.value}
-            note={card.note}
-            icon={statIcons[index]?.icon}
-            iconTone={statIcons[index]?.iconTone}
-          />
-        ))}
-      </section>
+        <SurfaceCard
+          title="Weekly booking trend"
+          description={
+            isPlatformAdmin
+              ? "Platform trend data comes from the admin dashboard API."
+              : `Last 7 days of booking activity for ${selectedTenant?.name ?? "this tenant"}.`
+          }
+        >
+          {isPlatformAdmin ? (
+            adminLoading ? (
+              <LoadingSkeleton />
+            ) : (
+              <DashboardTrendChart
+                points={trendPoints}
+                revenueLabel={formatMoney(
+                  platformStats?.revenue.amount,
+                  platformStats?.revenue.currency,
+                )}
+              />
+            )
+          ) : loading ? (
+            <LoadingSkeleton />
+          ) : (
+            <DashboardTrendChart
+              points={trendPoints}
+              revenueLabel={formatMoney(tenantStats?.revenue?.amount, tenantStats?.revenue?.currency)}
+            />
+          )}
+        </SurfaceCard>
+      </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.95fr)]">
         <SurfaceCard
@@ -353,7 +355,7 @@ export default function AdminDashboardPage() {
           description={
             isPlatformAdmin
               ? "Latest reservations across the selected tenant."
-              : "Last 10 bookings created within the last month for this tenant."
+              : "Last 8 bookings created within the last month for this tenant."
           }
         >
           <TableShell
@@ -366,7 +368,7 @@ export default function AdminDashboardPage() {
               "Amount",
             ]}
           >
-            {recentBookings.map((booking) => (
+            {recentBookings.slice(0, 8).map((booking) => (
               <tr key={booking.id}>
                 <td className="px-4 py-4 text-sm font-semibold text-slate-950">
                   {"bookingRef" in booking ? booking.bookingRef : booking.booking_reference ?? "N/A"}
@@ -394,9 +396,6 @@ export default function AdminDashboardPage() {
               </tr>
             ))}
           </TableShell>
-          <div className="mt-4">
-            <PaginationPlaceholder />
-          </div>
         </SurfaceCard>
 
         <SurfaceCard
@@ -420,7 +419,7 @@ export default function AdminDashboardPage() {
                 {error}
               </div>
             ) : null}
-            {recentTenantActivities.map((activity) => (
+            {visibleTenantActivities.map((activity) => (
               <div key={activity.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
