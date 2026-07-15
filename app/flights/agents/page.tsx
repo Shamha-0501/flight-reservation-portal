@@ -6,12 +6,14 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import Container from "@/src/shared/ui/Container";
 import FlightDetailsSidebar from "@/src/shared/components/booking/FlightDetailsSidebar";
+import OfferExpiredNotice from "@/src/shared/components/flights/OfferExpiredNotice";
 import { getActiveAgencies, type TenantAgency } from "@/src/api/routes/tenant/agencies";
 import { getFlightOfferDetails } from "@/src/api/routes/flightSearch/search";
 import {
   mapDuffelOfferToBookingViewModel,
 } from "@/src/shared/lib/flightsData";
 import { LoadingSkeleton } from "@/src/shared/components/admin/AdminUI";
+import { getExpiredOfferMessage, isExpiredOfferMessage } from "@/src/shared/lib/flightOfferErrors";
 
 type DuffelPlace = {
   iata_code?: string;
@@ -155,7 +157,7 @@ export default function AgentsPage() {
           if (fallbackOffer) {
             setSelectedOffer(fallbackOffer);
             setFlightError(
-              "Live fare confirmation is temporarily unavailable. Showing the selected flight snapshot."
+              getExpiredOfferMessage()
             );
           } else {
             setSelectedOffer(null);
@@ -219,6 +221,7 @@ export default function AgentsPage() {
     nextParams.set("tenant_key", agency.key);
     nextParams.set("agent_name", agency.name);
     if (offerId) nextParams.set("offerId", offerId);
+    if (returnTo) nextParams.set("returnTo", returnTo);
     if (adults) nextParams.set("adults", adults);
     if (children) nextParams.set("children", children);
     if (infants) nextParams.set("infants", infants);
@@ -253,15 +256,13 @@ export default function AgentsPage() {
             ) : null}
 
             {flightError ? (
-              <div
-                className={`rounded-2xl border p-5 text-sm ${
-                  selectedOffer
-                    ? "border-amber-200 bg-amber-50 text-amber-800"
-                    : "border-rose-200 bg-rose-50 text-rose-700"
-                }`}
-              >
-                {flightError}
-              </div>
+              isExpiredOfferMessage(flightError) ? (
+                <OfferExpiredNotice href={returnTo} />
+              ) : (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
+                  {flightError}
+                </div>
+              )
             ) : null}
 
             {loadingAgencies ? (
