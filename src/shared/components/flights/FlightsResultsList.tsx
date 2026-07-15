@@ -37,6 +37,10 @@ export default function FlightsResultsList({
     Boolean(appliedFilters.layoverAirports?.length) ||
     Boolean(appliedFilters.departureTime?.outbound?.min != null) ||
     Boolean(appliedFilters.departureTime?.outbound?.max != null) ||
+    Boolean(appliedFilters.departureTime?.inbound?.min != null) ||
+    Boolean(appliedFilters.departureTime?.inbound?.max != null) ||
+    Boolean(appliedFilters.totalDuration?.min != null) ||
+    Boolean(appliedFilters.totalDuration?.max != null) ||
     Boolean(appliedFilters.refundable) ||
     Boolean(appliedFilters.changeable);
 

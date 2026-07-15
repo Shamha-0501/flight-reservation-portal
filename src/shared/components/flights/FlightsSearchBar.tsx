@@ -88,7 +88,7 @@ function AirportField({
   const shownOptions = useMemo(() => options.slice(0, 8), [options]);
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative z-40">
       <InputShell label={label}>
         <input
           value={value}
@@ -103,7 +103,7 @@ function AirportField({
       </InputShell>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-72 overflow-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
+        <div className="absolute left-0 right-0 top-full z-[120] mt-2 max-h-72 overflow-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
           {loading ? (
             <div className="px-4 py-3 text-sm text-slate-500">Searching...</div>
           ) : shownOptions.length === 0 ? (
@@ -194,7 +194,7 @@ function PassengersPopover({
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative z-40">
       <InputShell label="Passengers">
         <button
           type="button"
@@ -206,7 +206,7 @@ function PassengersPopover({
       </InputShell>
 
       {open && (
-        <div className="absolute right-0 top-full z-30 mt-2 w-[320px] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl text-slate-900">
+        <div className="absolute right-0 top-full z-[120] mt-2 w-[320px] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl text-slate-900">
           <div className="mb-4">
             <div className="text-xs font-semibold text-slate-500 uppercase tracking-[0.16em]">
               Cabin class
@@ -406,12 +406,14 @@ export default function FlightsSearchBar() {
   };
 
   return (
-    <div className="rounded-[20px] border border-white/10 bg-[#16233b]/95 p-4 shadow-xl backdrop-blur">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-[0.9fr_1.2fr_auto_1.2fr_0.9fr_0.9fr_1.1fr_auto]">
-        <InputShell label="Trip">
-      <TripTypeSelector
-        value={searchForm.tripType}
-        onChange={(next) => {
+    <div className="relative z-50 overflow-visible rounded-[20px] border border-white/10 bg-[#16233b]/95 p-4 shadow-xl backdrop-blur">
+      <div className="grid grid-cols-1 gap-3 md:items-stretch md:grid-cols-[0.95fr_1.15fr_auto_1.15fr_0.95fr_0.95fr_1.1fr_auto]">
+        <TripTypeSelector
+          label="Trip"
+          layout="inline"
+          value={searchForm.tripType}
+          tone="blue"
+          onChange={(next) => {
               tripTypeRef.current = next;
               setSearchForm((s) => ({
                 ...s,
@@ -425,9 +427,8 @@ export default function FlightsSearchBar() {
                 q.delete("return");
               }
               router.replace(`/flights?${q.toString()}`);
-        }}
-      />
-        </InputShell>
+          }}
+        />
 
         <AirportField
           label="From"

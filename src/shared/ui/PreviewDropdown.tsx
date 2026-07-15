@@ -15,6 +15,7 @@ type PreviewDropdownProps = {
   onChange: (value: string) => void;
   className?: string;
   menuClassName?: string;
+  tone?: "light" | "blue";
 };
 
 export default function PreviewDropdown({
@@ -24,6 +25,7 @@ export default function PreviewDropdown({
   onChange,
   className,
   menuClassName,
+  tone = "light",
 }: PreviewDropdownProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -125,6 +127,11 @@ export default function PreviewDropdown({
     setPreviewValue(value);
   };
 
+  const buttonBaseClassName =
+    tone === "blue"
+      ? "h-11 w-full rounded-xl border border-blue-400/45 bg-white/5 px-4 text-left text-sm font-semibold text-white outline-none shadow-[inset_0_0_0_1px_rgba(96,165,250,0.12)] transition-all duration-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-200/25"
+      : "h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-left text-sm text-slate-900 outline-none transition-all duration-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
+
   return (
     <div ref={rootRef} className="relative">
       <button
@@ -136,15 +143,21 @@ export default function PreviewDropdown({
           }
           openDropdown();
         }}
-        className={clsx(
-          "h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-left text-sm text-slate-900 outline-none transition-all duration-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100",
-          className
-        )}
+        className={clsx(buttonBaseClassName, className)}
       >
-        <span className={clsx(!selectedOption && !open && "text-slate-400")}>
+        <span
+          className={clsx(
+            !selectedOption && !open && (tone === "blue" ? "text-white/60" : "text-slate-400")
+          )}
+        >
           {headerLabel}
         </span>
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
+        <span
+          className={clsx(
+            "absolute right-3 top-1/2 -translate-y-1/2",
+            tone === "blue" ? "text-blue-200/90" : "text-slate-500"
+          )}
+        >
           <svg
             width="16"
             height="16"
@@ -168,7 +181,7 @@ export default function PreviewDropdown({
           ref={listRef}
           onScroll={onListScroll}
           className={clsx(
-            "absolute left-0 right-0 top-full z-40 mt-2 max-h-52 overflow-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-xl",
+            "absolute left-0 right-0 top-full z-[100] mt-2 max-h-52 overflow-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-xl",
             menuClassName
           )}
         >

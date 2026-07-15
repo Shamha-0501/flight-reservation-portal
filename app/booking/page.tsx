@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getFlightOfferDetails } from "@/src/api/routes/flightSearch/search";
+import OfferExpiredNotice from "@/src/shared/components/flights/OfferExpiredNotice";
 import {
   buildCreateOrderRequestBody,
   createOrder,
@@ -27,6 +28,7 @@ import ExtrasStep, {
 import PaymentStep from "@/src/shared/components/booking/steps/PaymentStep";
 import { BookingSectionSkeleton } from "@/src/shared/components/booking/BookingFlowSkeleton";
 import { mapDuffelOfferToBookingViewModel } from "@/src/shared/lib/flightsData";
+import { getExpiredOfferMessage, isExpiredOfferMessage } from "@/src/shared/lib/flightOfferErrors";
 import type { AgencyAddonRecord } from "@/src/shared/lib/agencyAddons";
 import {
   buildAgencyMarkupSnapshot,
@@ -283,6 +285,7 @@ export default function BookingPage() {
   );
   const agentNameFromUrl = searchParams.get("agent_name");
   const offerId = searchParams.get("offerId") || "";
+  const returnTo = searchParams.get("returnTo") || "/flights";
   const adults = Number(searchParams.get("adults") || 1);
   const children = Number(searchParams.get("children") || 0);
   const infants = Number(searchParams.get("infants") || 0);
@@ -560,9 +563,7 @@ export default function BookingPage() {
             setSelectedOffer(fallbackOffer);
             setSeatMapStatus(undefined);
             setSelectedFlight(mapDuffelOfferToBookingViewModel(fallbackOffer));
-            setFlightError(
-              "Live fare confirmation is temporarily unavailable. Showing the selected flight snapshot."
-            );
+            setFlightError(getExpiredOfferMessage());
           } else {
             setSelectedOffer(null);
             setSeatMapStatus(undefined);
@@ -744,15 +745,13 @@ export default function BookingPage() {
           {loadingFlight ? (
             <BookingSectionSkeleton />
           ) : flightError ? (
-            <div
-              className={`rounded-2xl border p-6 text-sm ${
-                selectedFlight
-                  ? "border-amber-200 bg-amber-50 text-amber-800"
-                  : "border-rose-200 bg-rose-50 text-rose-700"
-              }`}
-            >
-              {flightError}
-            </div>
+            isExpiredOfferMessage(flightError) ? (
+              <OfferExpiredNotice href={returnTo} />
+            ) : (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
+                {flightError}
+              </div>
+            )
           ) : null}
 
           {!loadingFlight && selectedFlight ? (

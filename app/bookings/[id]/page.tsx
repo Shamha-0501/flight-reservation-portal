@@ -51,6 +51,60 @@ function formatMoneyDetails(
   }
 }
 
+function getOrderMoney(order?: BookingListItem | null) {
+  const totals = order?.amounts;
+  const candidates = [
+    totals?.grand_total,
+    totals?.order_total,
+    totals?.total,
+  ];
+
+  const selected = candidates.find(
+    (entry): entry is { amount?: string | number | null; currency?: string | null } =>
+      Boolean(entry && entry.amount != null)
+  );
+
+  return {
+    amount: selected?.amount ?? null,
+    currency:
+      selected?.currency ??
+      totals?.grand_total?.currency ??
+      totals?.order_total?.currency ??
+      totals?.total?.currency ??
+      null,
+  };
+}
+
+function getAgencyCharges(order?: BookingListItem | null) {
+  const agencyMarkup = order?.meta?.agency_markup as
+    | { amount?: string | number | null; currency?: string | null }
+    | null
+    | undefined;
+  const addons = Array.isArray(order?.addons) ? order?.addons : [];
+
+  const addonTotal = addons.reduce((sum, addon) => {
+    const record = addon as Record<string, unknown>;
+    const amount =
+      parseNumericAmount(record.agency_addons_amount) ??
+      parseNumericAmount(record.total_addons_amount) ??
+      0;
+    return sum + amount;
+  }, 0);
+
+  const markupAmount = parseNumericAmount(agencyMarkup?.amount) ?? 0;
+  const addonCurrency = addons[0]
+    ? String((addons[0] as Record<string, unknown>).currency ?? "")
+    : "";
+  const currency = (agencyMarkup?.currency ?? addonCurrency) || null;
+
+  const total = markupAmount + addonTotal;
+
+  return {
+    amount: total > 0 ? total : null,
+    currency,
+  };
+}
+
 function toMoneyAmount(value: unknown): string | number | null {
   return typeof value === "string" || typeof value === "number" ? value : null;
 }
@@ -729,8 +783,14 @@ export default function BookingDetailsPage() {
   );
   const reschedulePaymentAmount =
     getOrderChangePaymentAmount(selectedChangeOffer) ?? 0;
+  const orderMoney = getOrderMoney(order);
+  const agencyCharges = getAgencyCharges(order);
+  const agencyChargesLabel = formatMoneyDetails(
+    agencyCharges.amount,
+    agencyCharges.currency || orderMoney.currency
+  );
   const reschedulePaymentCurrency =
-    selectedChangeOffer?.currency || order?.amounts?.total?.currency || "USD";
+    selectedChangeOffer?.currency || orderMoney.currency || "USD";
 
   const tenantKey = useMemo(
     () =>
@@ -803,12 +863,12 @@ export default function BookingDetailsPage() {
     normalizeStatusDetails(order?.cancellation_status) === "cancelled" &&
     normalizeStatusDetails(order?.refund_status) === "refund pending";
 
-  const totalAmount = formatMoneyDetails(order?.amounts?.total?.amount, order?.amounts?.total?.currency);
+  const totalAmount = formatMoneyDetails(orderMoney.amount, orderMoney.currency);
   const refundBeforeDeparture = getRefundBeforeDeparture(refundabilityStatus);
   const penaltyAmount = parseNumericAmount(refundBeforeDeparture?.penalty_amount) ?? 0;
   const penaltyCurrency =
-    refundBeforeDeparture?.penalty_currency || order?.amounts?.total?.currency || "USD";
-  const bookingTotalAmount = parseNumericAmount(order?.amounts?.total?.amount) ?? 0;
+    refundBeforeDeparture?.penalty_currency || orderMoney.currency || "USD";
+  const bookingTotalAmount = parseNumericAmount(orderMoney.amount) ?? 0;
   const cancellationPaymentAmount =
     parseNumericAmount(cancellationQuote?.cancellation_fee) ?? penaltyAmount;
   const cancellationPaymentCurrency =
@@ -1044,7 +1104,7 @@ export default function BookingDetailsPage() {
             orderChangeId,
             payment: buildOrderChangePaymentPayload(
               selectedOffer,
-              order?.amounts?.total?.currency ?? "USD"
+              orderMoney.currency ?? "USD"
             ) ?? undefined,
           })
         : preparedChange;
@@ -1299,6 +1359,7 @@ export default function BookingDetailsPage() {
                   label="Refund"
                   value={order.refund_status || "-"}
                 />
+                <InfoCardDetails label="Agency charges" value={agencyChargesLabel} />
                 <InfoCardDetails label="Total" value={totalAmount} />
               </section>
 
@@ -1331,8 +1392,12 @@ export default function BookingDetailsPage() {
                       <span className="font-bold text-slate-950">{totalAmount}</span>
                     </div>
                     <div className="flex items-center justify-between gap-4 text-slate-600">
+                      <span>Agency charges</span>
+                      <span className="font-bold text-slate-950">{agencyChargesLabel}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 text-slate-600">
                       <span>Currency</span>
-                      <span className="font-bold text-slate-950">{order.amounts?.total?.currency || "-"}</span>
+                      <span className="font-bold text-slate-950">{orderMoney.currency || "-"}</span>
                     </div>
                     <div className="border-t border-slate-200 pt-3">
                       <div className="flex items-center justify-between gap-4">
@@ -1700,7 +1765,7 @@ export default function BookingDetailsPage() {
                       rescheduleOffers.map((offer) => {
                         const offerView = buildOrderChangeOfferView(
                           offer,
-                          order?.amounts?.total?.currency ?? "USD"
+                          orderMoney.currency ?? "USD"
                         );
                         const offerId = offerView.id;
                         const isSelected = selectedChangeOfferId === offerId;
@@ -1894,7 +1959,7 @@ export default function BookingDetailsPage() {
                         label="Estimated refund"
                         value={formatMoneyDetails(
                           estimatedRefundAmount,
-                          order?.amounts?.total?.currency || penaltyCurrency
+                          orderMoney.currency || penaltyCurrency
                         )}
                       />
                     </div>

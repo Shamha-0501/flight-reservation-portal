@@ -3,7 +3,18 @@ import type { FlightSearchAppliedFilters } from "@/src/api/types";
 type Props = {
   meta: any | null;
   appliedFilters: FlightSearchAppliedFilters;
-  onRemove: (type: "price" | "stop" | "baggage" | "airline" | "layoverAirport", value?: string) => void;
+  onRemove: (
+    type:
+      | "price"
+      | "stop"
+      | "baggage"
+      | "airline"
+      | "layoverAirport"
+      | "departureTime"
+      | "refundable"
+      | "changeable",
+    value?: string
+  ) => void;
   onClearAll: () => void;
 };
 
@@ -18,6 +29,23 @@ function getFacetLabel(items: any[] | undefined, key: string) {
   return items?.find((item) => item.key === key)?.label ?? key;
 }
 
+function minutesToLabel(minutes: number) {
+  const normalized = Math.max(0, Math.min(1439, minutes));
+  const hours = Math.floor(normalized / 60);
+  const mins = normalized % 60;
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+function getTimeRangeLabel(range?: { min?: number; max?: number }) {
+  if (!range) return null;
+  if (range.min == null && range.max == null) return null;
+
+  const minLabel = range.min != null ? minutesToLabel(range.min) : "Any";
+  const maxLabel = range.max != null ? minutesToLabel(range.max) : "Any";
+
+  return `${minLabel} - ${maxLabel}`;
+}
+
 export default function FlightsActiveFiltersBar({
   meta,
   appliedFilters,
@@ -30,7 +58,7 @@ export default function FlightsActiveFiltersBar({
     const currency = meta?.summary?.best?.price?.currency || "EUR";
     const min = appliedFilters.price?.min != null ? appliedFilters.price.min : "Any";
     const max = appliedFilters.price?.max != null ? appliedFilters.price.max : "Any";
-   chips.push({
+    chips.push({
       key: "price",
       type: "price",
       label: `Price: ${currency} ${min} - ${max}`,
@@ -65,12 +93,48 @@ export default function FlightsActiveFiltersBar({
   });
   (appliedFilters.layoverAirports ?? []).forEach((airportKey) => {
     chips.push({
-    key: `layover-${airportKey}`,
-    type: "layoverAirport",
-    value: airportKey,
-    label: getFacetLabel(meta?.facets?.layoverAirports, airportKey),
+      key: `layover-${airportKey}`,
+      type: "layoverAirport",
+      value: airportKey,
+      label: getFacetLabel(meta?.facets?.layoverAirports, airportKey),
+    });
   });
-});
+
+  const outboundRange = getTimeRangeLabel(appliedFilters.departureTime?.outbound);
+  if (outboundRange) {
+    chips.push({
+      key: "departure-outbound",
+      type: "departureTime",
+      value: "outbound",
+      label: `Departure: ${outboundRange}`,
+    });
+  }
+
+  const inboundRange = getTimeRangeLabel(appliedFilters.departureTime?.inbound);
+  if (inboundRange) {
+    chips.push({
+      key: "departure-inbound",
+      type: "departureTime",
+      value: "inbound",
+      label: `Return: ${inboundRange}`,
+    });
+  }
+
+  if (appliedFilters.refundable) {
+    chips.push({
+      key: "refundable",
+      type: "refundable",
+      label: "Refundable only",
+    });
+  }
+
+  if (appliedFilters.changeable) {
+    chips.push({
+      key: "changeable",
+      type: "changeable",
+      label: "Changeable only",
+    });
+  }
 
   if (!chips.length) return null;
 
