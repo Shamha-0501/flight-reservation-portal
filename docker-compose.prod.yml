@@ -1,10 +1,10 @@
 services:
-  tourism-app:
+  flightportal-app:
     build:
       context: .
       dockerfile: Dockerfile
-    image: tourism-app:prod
-    container_name: tourism-app
+    image: flightportal-app:prod
+    container_name: flightportal-app
     restart: unless-stopped
     env_file:
       - .env
@@ -17,21 +17,21 @@ services:
     expose:
       - "3000"
     networks:
-      - tourismnet
+      - flightportalnet
 
   nginx:
     image: nginx:1.27-alpine
-    container_name: tourism-app-nginx
+    container_name: flightportal-nginx
     restart: unless-stopped
     ports:
       - "80:80"
     volumes:
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - tourism-app
+      - flightportal-app
     networks:
-      - tourismnet
+      - flightportalnet
 
 networks:
-  tourismnet:
+  flightportalnet:
     driver: bridge
