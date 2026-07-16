@@ -21,7 +21,15 @@ type Props = {
 type Chip = {
   key: string;
   label: string;
-  type: "price" | "stop" | "baggage" | "airline" | "layoverAirport";
+  type:
+    | "price"
+    | "stop"
+    | "baggage"
+    | "airline"
+    | "layoverAirport"
+    | "departureTime"
+    | "refundable"
+    | "changeable";
   value?: string;
 };
 

@@ -1,12 +1,13 @@
 {
-  "name": "tourism-app",
+  "name": "flightportal-app",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:frontend": "node --test tests/frontend/bookingDisplay.test.js tests/frontend/bookingDetails.test.js"
   },
   "dependencies": {
     "@duffel/components": "^3.16.0",
