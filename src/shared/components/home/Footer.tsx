@@ -3,7 +3,6 @@ import Link from "next/link";
 const exploreLinks = [
   { label: "Flights", href: "/#search" },
   { label: "Bookings", href: "/bookings" },
-  { label: "Popular Routes", href: "/#popular-routes" },
   { label: "Agencies", href: "/agencies" },
 ];
 
@@ -77,22 +76,8 @@ export default function Footer() {
           <FooterColumn title="Legal" links={legalLinks} />
         </div>
 
-        <div className="grid gap-2 border-t border-slate-100 pt-3 text-sm text-slate-500 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-          <p className="justify-self-start">
-            © {new Date().getFullYear()} Flight Portal. All rights reserved.
-          </p>
-          <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 justify-self-center">
-            <Link href="/privacy" className="transition hover:text-blue-700">
-              Privacy
-            </Link>
-            <Link href="/terms" className="transition hover:text-blue-700">
-              Terms
-            </Link>
-            <Link href="/contact" className="transition hover:text-blue-700">
-              Support
-            </Link>
-          </div>
-          <div className="hidden lg:block" />
+        <div className="border-t border-slate-100 pt-3 text-center text-sm text-slate-500">
+          <p>© 2026 Flight Portal. All rights reserved.</p>
         </div>
       </div>
     </footer>
