@@ -87,8 +87,12 @@ export default function SearchFlightsBar() {
         overflow-visible
       "
     >
-      <div className="mb-3">
-        <TripTypeSelector value={tripType} onChange={handleTripTypeChange} />
+      <div className="mb-3 flex justify-start">
+        <TripTypeSelector
+          layout="compact"
+          value={tripType}
+          onChange={handleTripTypeChange}
+        />
       </div>
 
       <div className="flex flex-col lg:flex-row gap-3">
