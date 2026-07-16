@@ -23,6 +23,7 @@ export type AdminNavItem = {
   audience: AdminNavAudience;
   requiresTenantLeadership?: boolean;
   requiresTenantOwner?: boolean;
+  requiresPlatformAdmin?: boolean;
 };
 
 export const adminNavItems: AdminNavItem[] = [
@@ -106,8 +107,10 @@ export const adminNavItems: AdminNavItem[] = [
     href: "/admin/reports",
     match: "/admin/reports",
     icon: BarChart3,
-    description: "Analyze bookings, refunds, revenue, and portal performance.",
-    audience: "platform",
+    description: "Analyze platform-wide or tenant-scoped bookings, refunds, revenue, and performance.",
+    audience: "all",
+    requiresTenantOwner: true,
+    requiresPlatformAdmin: true,
   },
   {
     title: "Settings",

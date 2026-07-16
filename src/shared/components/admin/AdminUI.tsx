@@ -83,7 +83,7 @@ export function SurfaceCard({
   actions,
   className = "",
 }: {
-  title?: string;
+  title?: ReactNode;
   description?: string;
   children: ReactNode;
   actions?: ReactNode;

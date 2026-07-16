@@ -27,10 +27,12 @@ import {
   TableShell,
 } from "@/src/shared/components/admin/AdminUI";
 import { agencies, monthlyReportRows } from "@/src/shared/components/admin/adminData";
+import { useAuth } from "@/src/shared/auth/AuthProvider";
 
 const groupByOptions: AdminReportGroupBy[] = ["day", "week", "month"];
 
 export default function AdminReportsPage() {
+  const { isPlatformAdmin, selectedTenant, roleLabel } = useAuth();
   const [fromDate, setFromDate] = useState(getDefaultFromDate());
   const [toDate, setToDate] = useState(getToday());
   const [groupBy, setGroupBy] = useState<AdminReportGroupBy>("month");
@@ -47,6 +49,12 @@ export default function AdminReportsPage() {
         return;
       }
 
+      if (!isPlatformAdmin && !selectedTenant?.id) {
+        setReport(buildFallbackReport(groupBy));
+        setError("Tenant reports need a selected workspace.");
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
@@ -55,6 +63,7 @@ export default function AdminReportsPage() {
           from: fromDate,
           to: toDate,
           group_by: groupBy,
+          ...(isPlatformAdmin ? {} : { tenant_id: selectedTenant?.id }),
         });
 
         if (!active) return;
@@ -81,7 +90,7 @@ export default function AdminReportsPage() {
     return () => {
       active = false;
     };
-  }, [fromDate, groupBy, refreshNonce, toDate]);
+  }, [fromDate, groupBy, isPlatformAdmin, refreshNonce, selectedTenant?.id, toDate]);
 
   const activeReport = report ?? buildFallbackReport(groupBy);
   const summary = activeReport.summary;
@@ -143,6 +152,7 @@ export default function AdminReportsPage() {
         to: toDate,
         group_by: groupBy,
         format: "csv",
+        ...(isPlatformAdmin ? {} : { tenant_id: selectedTenant?.id }),
       });
       downloadBlob(`admin-reports-${fromDate}-to-${toDate}.csv`, blob);
     } catch {
@@ -158,6 +168,7 @@ export default function AdminReportsPage() {
         to: toDate,
         group_by: groupBy,
         format: "pdf",
+        ...(isPlatformAdmin ? {} : { tenant_id: selectedTenant?.id }),
       });
       downloadBlob(`admin-reports-${fromDate}-to-${toDate}.pdf`, blob);
     } catch {
@@ -170,7 +181,11 @@ export default function AdminReportsPage() {
   return (
     <AdminPage
       title="Reports"
-      description="Backend-driven reporting for revenue, bookings, cancellations, refunds, and agency performance."
+      description={
+        isPlatformAdmin
+          ? `Platform-wide reporting for ${roleLabel}. This view includes every agency and overall portal performance.`
+          : `Tenant-scoped reporting for ${selectedTenant?.name ?? "this workspace"}. This view only includes data for the selected tenant.`
+      }
       actions={
         <>
           <AdminButton variant="secondary" onClick={handleExportCsv}>
@@ -186,7 +201,11 @@ export default function AdminReportsPage() {
     >
       <SurfaceCard
         title="Report controls"
-        description="Pick a date range and grouping. The page will ask the backend for the aggregated report."
+        description={
+          isPlatformAdmin
+            ? "Pick a date range and grouping. The page requests the aggregated platform report."
+            : `Pick a date range and grouping. The page requests only ${selectedTenant?.name ?? "this tenant"} data.`
+        }
       >
           <div className="grid gap-4 lg:grid-cols-[1fr_1fr_180px_auto]">
           <DateField label="From" value={fromDate} onChange={setFromDate} max={toDate} />

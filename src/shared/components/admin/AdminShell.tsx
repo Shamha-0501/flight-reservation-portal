@@ -41,6 +41,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const visibleNavItems = useMemo(
     () =>
       adminNavItems.filter((item) => {
+        if (item.requiresPlatformAdmin && item.requiresTenantOwner) {
+          return isPlatformAdmin || isTenantOwner;
+        }
+        if (item.requiresPlatformAdmin) {
+          return isPlatformAdmin;
+        }
         if (item.requiresTenantOwner) {
           return isTenantOwner;
         }
