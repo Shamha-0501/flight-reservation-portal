@@ -407,29 +407,30 @@ export default function FlightsSearchBar() {
 
   return (
     <div className="relative z-50 overflow-visible rounded-[20px] border border-white/10 bg-[#16233b]/95 p-4 shadow-xl backdrop-blur">
-      <div className="grid grid-cols-1 gap-3 md:items-stretch md:grid-cols-[0.95fr_1.15fr_auto_1.15fr_0.95fr_0.95fr_1.1fr_auto]">
+      <div className="mb-3 flex justify-start">
         <TripTypeSelector
-          label="Trip"
-          layout="inline"
+          layout="compact"
           value={searchForm.tripType}
           tone="blue"
           onChange={(next) => {
-              tripTypeRef.current = next;
-              setSearchForm((s) => ({
-                ...s,
-                tripType: next,
-                return: next === "oneway" ? "" : s.return,
-              }));
+            tripTypeRef.current = next;
+            setSearchForm((s) => ({
+              ...s,
+              tripType: next,
+              return: next === "oneway" ? "" : s.return,
+            }));
 
-              const q = new URLSearchParams(searchParams.toString());
-              q.set("trip", next);
-              if (next === "oneway") {
-                q.delete("return");
-              }
-              router.replace(`/flights?${q.toString()}`);
+            const q = new URLSearchParams(searchParams.toString());
+            q.set("trip", next);
+            if (next === "oneway") {
+              q.delete("return");
+            }
+            router.replace(`/flights?${q.toString()}`);
           }}
         />
+      </div>
 
+      <div className="grid grid-cols-1 gap-3 md:items-stretch md:grid-cols-[1.15fr_auto_1.15fr_0.95fr_0.95fr_1.1fr_auto]">
         <AirportField
           label="From"
           placeholder="City or Airport"

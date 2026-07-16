@@ -19,8 +19,23 @@ export default function TripTypeSelector({
   onChange: (v: TripType) => void;
   tone?: "light" | "blue";
   label?: string;
-  layout?: "stacked" | "inline";
+  layout?: "stacked" | "inline" | "compact";
 }) {
+  if (layout === "compact") {
+    return (
+      <PreviewDropdown
+        value={value}
+        options={TRIP_TYPE_OPTIONS}
+        placeholder="Trip type"
+        onChange={(nextValue) => onChange(nextValue as TripType)}
+        tone={tone}
+        fullWidth={false}
+        className="h-10 pr-10"
+        menuClassName="left-0 right-auto w-full min-w-[180px]"
+      />
+    );
+  }
+
   if (layout === "inline") {
     return (
       <div className="flex h-14 w-full items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3">

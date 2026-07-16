@@ -47,10 +47,18 @@ export type BookingListItem = {
     email?: string | null;
     phone_number?: string | null;
   }>;
-  addons?: Record<string, unknown> | null;
+  addons?: Array<Record<string, unknown>> | null;
   meta?: {
     offer?: Record<string, unknown> | null;
     duffel_order?: Record<string, unknown> | null;
+    agency_markup?: {
+      amount?: string | number | null;
+      currency?: string | null;
+      label?: string | null;
+      enabled?: boolean | null;
+      mode?: string | null;
+      value?: string | number | null;
+    } | null;
     change?: {
       status?: string | null;
       request_id?: string | null;

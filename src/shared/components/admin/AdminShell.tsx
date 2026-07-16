@@ -42,7 +42,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     () =>
       adminNavItems.filter((item) => {
         if (item.requiresTenantOwner) {
-          return isPlatformAdmin || isTenantOwner;
+          return isTenantOwner;
         }
         if (item.audience === "all") return true;
         if (item.audience === "platform") return isPlatformAdmin;

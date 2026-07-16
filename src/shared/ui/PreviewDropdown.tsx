@@ -16,6 +16,7 @@ type PreviewDropdownProps = {
   className?: string;
   menuClassName?: string;
   tone?: "light" | "blue";
+  fullWidth?: boolean;
 };
 
 export default function PreviewDropdown({
@@ -26,6 +27,7 @@ export default function PreviewDropdown({
   className,
   menuClassName,
   tone = "light",
+  fullWidth = true,
 }: PreviewDropdownProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -129,8 +131,8 @@ export default function PreviewDropdown({
 
   const buttonBaseClassName =
     tone === "blue"
-      ? "h-11 w-full rounded-xl border border-blue-400/45 bg-white/5 px-4 text-left text-sm font-semibold text-white outline-none shadow-[inset_0_0_0_1px_rgba(96,165,250,0.12)] transition-all duration-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-200/25"
-      : "h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-left text-sm text-slate-900 outline-none transition-all duration-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
+      ? `h-11 ${fullWidth ? "w-full" : "w-fit min-w-[160px]"} rounded-xl border border-blue-400/45 bg-white/5 px-4 text-left text-sm font-semibold text-white outline-none shadow-[inset_0_0_0_1px_rgba(96,165,250,0.12)] transition-all duration-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-200/25`
+      : `h-11 ${fullWidth ? "w-full" : "w-fit min-w-[160px]"} rounded-xl border border-slate-300 bg-white px-4 text-left text-sm text-slate-900 outline-none transition-all duration-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100`;
 
   return (
     <div ref={rootRef} className="relative">

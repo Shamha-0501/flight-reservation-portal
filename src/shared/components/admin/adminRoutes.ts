@@ -116,6 +116,5 @@ export const adminNavItems: AdminNavItem[] = [
     icon: Settings,
     description: "Configure tenant preferences, portal options, and admin controls.",
     audience: "all",
-    requiresTenantOwner: true,
   },
 ];
