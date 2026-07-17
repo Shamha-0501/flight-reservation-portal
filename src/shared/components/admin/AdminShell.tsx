@@ -61,7 +61,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     [canManageTenantUsers, isPlatformAdmin, isTenantOwner, isTenantWorkspaceRole],
   );
   const activeRoute =
-    visibleNavItems.find((item) => pathname?.startsWith(item.match)) ??
+    visibleNavItems.find((item) => pathname?.startsWith(isPlatformAdmin ? item.match : (item.tenantMatch ?? item.match))) ??
     visibleNavItems[0];
 
   useEffect(() => {
@@ -90,7 +90,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     }
 
     const isRouteAllowed = visibleNavItems.some((item) =>
-      pathname?.startsWith(item.match),
+      pathname?.startsWith(isPlatformAdmin ? item.match : (item.tenantMatch ?? item.match)),
     );
     if (!isRouteAllowed) {
       router.replace(visibleNavItems[0].href);
@@ -99,6 +99,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     access.kind,
     isAdmin,
     isAuthenticated,
+    isPlatformAdmin,
     isInvitationRoute,
     loading,
     pathname,
@@ -206,12 +207,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {visibleNavItems.map((item) => {
             const Icon = item.icon;
-            const active = pathname?.startsWith(item.match);
+            const href = isPlatformAdmin ? item.href : (item.tenantHref ?? item.href);
+            const match = isPlatformAdmin ? item.match : (item.tenantMatch ?? item.match);
+            const active = pathname?.startsWith(match);
 
             return (
               <Link
-                key={item.href}
-                href={item.href}
+                key={href}
+                href={href}
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
                   active
