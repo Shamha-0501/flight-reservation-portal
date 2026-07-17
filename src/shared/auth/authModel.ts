@@ -32,7 +32,7 @@ export type AuthAccessResult =
   | { kind: "guest"; destination: "/login" };
 
 const CUSTOMER_ROLES = new Set(["customer"]);
-const PLATFORM_ROLES = new Set(["system_developer", "super_admin", "admin"]);
+const PLATFORM_ROLES = new Set(["system_developer", "super_admin"]);
 const TENANT_LEADERSHIP_ROLES = new Set(["tenant_owner", "tenant_admin", "agency_owner"]);
 const TENANT_OPERATION_ROLES = new Set([
   "tenant_owner",

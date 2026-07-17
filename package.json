@@ -27,7 +27,8 @@
     "react-phone-number-input": "^3.4.16",
     "react-redux": "^9.2.0",
     "react-select": "^5.10.2",
-    "react-select-country-list": "^2.2.3"
+    "react-select-country-list": "^2.2.3",
+    "recharts": "^3.9.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

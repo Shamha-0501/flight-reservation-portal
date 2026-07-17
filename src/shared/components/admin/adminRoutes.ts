@@ -18,6 +18,8 @@ export type AdminNavItem = {
   title: string;
   href: string;
   match: string;
+  tenantHref?: string;
+  tenantMatch?: string;
   icon: LucideIcon;
   description: string;
   audience: AdminNavAudience;
@@ -106,11 +108,11 @@ export const adminNavItems: AdminNavItem[] = [
     title: "Reports",
     href: "/admin/reports",
     match: "/admin/reports",
+    tenantHref: "/admin/tenant/reports",
+    tenantMatch: "/admin/tenant/reports",
     icon: BarChart3,
     description: "Analyze platform-wide or tenant-scoped bookings, refunds, revenue, and performance.",
     audience: "all",
-    requiresTenantOwner: true,
-    requiresPlatformAdmin: true,
   },
   {
     title: "Settings",
