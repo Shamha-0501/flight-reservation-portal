@@ -996,30 +996,9 @@ export default function BookingDetailsPage() {
     setPaymentModalFlow("cancellation");
   };
 
-  const openReschedulePaymentModal = () => {
-    const activeOffer = selectedChangeOffer ?? rescheduleOffers[0] ?? null;
-    const activeOfferId = String((activeOffer as Record<string, unknown> | null)?.id ?? "");
-
-    if (!activeOffer || !activeOfferId) {
-      setRescheduleError("Select a reschedule offer before continuing.");
-      return;
-    }
-
-    if (activeOfferId !== selectedChangeOfferId) {
-      setSelectedChangeOfferId(activeOfferId);
-    }
-
-    setRescheduleError(null);
-    setPaymentModalFlow("reschedule");
-  };
-
   const selectRescheduleOffer = (offerId: string) => {
     setSelectedChangeOfferId(offerId);
-
-    if (rescheduleIntent === "action") {
-      setRescheduleError(null);
-      setPaymentModalFlow("reschedule");
-    }
+    setRescheduleError(null);
   };
 
   const openRescheduleReview = async () => {
@@ -1987,14 +1966,19 @@ export default function BookingDetailsPage() {
               ) : (
                 <button
                   type="button"
-                  onClick={openReschedulePaymentModal}
+                  onClick={() => void submitRescheduleChange()}
                   disabled={
                     !selectedChangeOfferId ||
+                    confirmingReschedule ||
                     Boolean(rescheduleSuccess)
                   }
                   className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(79,70,229,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(79,70,229,0.34)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                 >
-                  {selectedChangeOfferId ? "Confirm selected offer" : "Select an offer first"}
+                  {confirmingReschedule
+                    ? "Confirming..."
+                    : selectedChangeOfferId
+                      ? "Confirm selected offer"
+                      : "Select an offer first"}
                 </button>
               )}
             </div>
