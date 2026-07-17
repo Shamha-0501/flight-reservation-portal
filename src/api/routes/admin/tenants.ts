@@ -1,5 +1,5 @@
 import { csrf, http } from "@/src/api/config/http";
-import { getActiveAgencies } from "@/src/api/routes/tenant/agencies";
+import { getActiveAgencies, type TenantAgency } from "@/src/api/routes/tenant/agencies";
 
 export type AdminTenant = {
   id: number;
@@ -81,15 +81,28 @@ async function mutateTenant(tenantId: number | string, action: TenantAction): Pr
   }
 }
 
-function normalizeAdminTenant(tenant: AdminTenant): AdminTenant {
+function normalizeAdminTenant(tenant: AdminTenant | TenantAgency): AdminTenant {
+  const contactEmail =
+    typeof tenant.meta?.contact_email === "string"
+      ? tenant.meta.contact_email
+      : typeof tenant.meta?.business_email === "string"
+        ? tenant.meta.business_email
+        : undefined;
+  const contactPhone =
+    typeof tenant.meta?.contact_phone === "string"
+      ? tenant.meta.contact_phone
+      : typeof tenant.meta?.business_phone === "string"
+        ? tenant.meta.business_phone
+        : undefined;
+
   return {
     ...tenant,
     status: tenant.status ?? "active",
     meta: tenant.meta
       ? {
           ...tenant.meta,
-          contact_email: tenant.meta.contact_email ?? tenant.meta.business_email,
-          contact_phone: tenant.meta.contact_phone ?? tenant.meta.business_phone,
+          contact_email: contactEmail,
+          contact_phone: contactPhone,
         }
       : tenant.meta,
   };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Ban,
   CheckCircle2,
@@ -38,6 +38,15 @@ import {
 type TenantAction = "approve" | "reject" | "suspend" | "reactivate";
 type ToastTone = "success" | "error" | "info";
 
+function InlineLoading({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+      <span>{label}</span>
+    </span>
+  );
+}
+
 type ToastItem = {
   id: number;
   tone: ToastTone;
@@ -58,10 +67,6 @@ export default function AdminAgenciesPage() {
   const [openMenuTenantId, setOpenMenuTenantId] = useState<number | null>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const toastIdRef = useRef(0);
-
-  useEffect(() => {
-    void loadTenants();
-  }, []);
 
   useEffect(() => {
     if (!openMenuTenantId) return;
@@ -106,7 +111,7 @@ export default function AdminAgenciesPage() {
     };
   }, [allTenants, queueTenants]);
 
-  async function loadTenants() {
+  const loadTenants = useCallback(async () => {
     try {
       setLoading(true);
       const [pendingData, allData] = await Promise.all([
@@ -120,7 +125,11 @@ export default function AdminAgenciesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    void loadTenants();
+  }, [loadTenants]);
 
   function openActionModal(tenant: AdminTenant, action: TenantAction) {
     setPendingAction({ tenant, action });

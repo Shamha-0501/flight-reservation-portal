@@ -51,6 +51,36 @@ function formatMoneyDetails(
   }
 }
 
+function formatDisplayedRescheduleMoney(
+  amount?: string | number | null,
+  currency?: string | null
+): string {
+  const normalizedCurrency = String(currency ?? "").trim().toUpperCase();
+  if (amount == null) return "-";
+
+  if (normalizedCurrency === DUFFEL_SUPPLIER_CURRENCY) {
+    const numeric = Number(amount);
+    const convertedAmount = Number.isFinite(numeric) ? numeric * EUR_TO_LKR_RATE : numeric;
+    return formatMoneyDetails(convertedAmount, "LKR");
+  }
+
+  return formatMoneyDetails(amount, currency);
+}
+
+function getDisplayedRescheduleAmount(
+  amount?: number | null,
+  currency?: string | null
+): number | null {
+  if (amount == null) return null;
+
+  const normalizedCurrency = String(currency ?? "").trim().toUpperCase();
+  if (normalizedCurrency === DUFFEL_SUPPLIER_CURRENCY) {
+    return amount * EUR_TO_LKR_RATE;
+  }
+
+  return amount;
+}
+
 function getOrderMoney(order?: BookingListItem | null) {
   const totals = order?.amounts;
   const candidates = [
@@ -382,7 +412,7 @@ function buildOrderChangeOfferView(
         "Cabin not specified"
     ),
     amountLabel,
-    amountText: formatMoneyDetails(amountValue, currency),
+    amountText: formatDisplayedRescheduleMoney(amountValue, currency),
     amountHint,
     expiresText: rawOffer.expires_at ? `Expires ${formatDateDetails(String(rawOffer.expires_at))}` : undefined,
   };
@@ -832,6 +862,14 @@ export default function BookingDetailsPage() {
   const totalPaidLabel = formatMoneyDetails(totalPaidAmount, agencyChargeCurrency);
   const reschedulePaymentCurrency =
     selectedChangeOffer?.currency || orderMoney.currency || "USD";
+  const reschedulePaymentDisplayAmount = getDisplayedRescheduleAmount(
+    reschedulePaymentAmount,
+    reschedulePaymentCurrency
+  );
+  const reschedulePaymentDisplayCurrency =
+    String(reschedulePaymentCurrency).trim().toUpperCase() === DUFFEL_SUPPLIER_CURRENCY
+      ? "LKR"
+      : reschedulePaymentCurrency;
 
   const tenantKey = useMemo(
     () =>
@@ -959,13 +997,29 @@ export default function BookingDetailsPage() {
   };
 
   const openReschedulePaymentModal = () => {
-    if (!selectedChangeOfferId || !selectedChangeOffer) {
+    const activeOffer = selectedChangeOffer ?? rescheduleOffers[0] ?? null;
+    const activeOfferId = String((activeOffer as Record<string, unknown> | null)?.id ?? "");
+
+    if (!activeOffer || !activeOfferId) {
       setRescheduleError("Select a reschedule offer before continuing.");
       return;
     }
 
+    if (activeOfferId !== selectedChangeOfferId) {
+      setSelectedChangeOfferId(activeOfferId);
+    }
+
     setRescheduleError(null);
     setPaymentModalFlow("reschedule");
+  };
+
+  const selectRescheduleOffer = (offerId: string) => {
+    setSelectedChangeOfferId(offerId);
+
+    if (rescheduleIntent === "action") {
+      setRescheduleError(null);
+      setPaymentModalFlow("reschedule");
+    }
   };
 
   const openRescheduleReview = async () => {
@@ -1828,7 +1882,7 @@ export default function BookingDetailsPage() {
                             key={offerId || offerView.route}
                             type="button"
                             onClick={() => {
-                              setSelectedChangeOfferId(offerId);
+                              selectRescheduleOffer(offerId);
                             }}
                             aria-pressed={isSelected}
                             className={`rounded-2xl border p-4 text-left transition ${
@@ -2214,12 +2268,12 @@ export default function BookingDetailsPage() {
                 amountDue={
                   paymentModalFlow === "cancellation"
                     ? cancellationPaymentAmount
-                    : reschedulePaymentAmount
+                    : reschedulePaymentDisplayAmount
                 }
                 currency={
                   paymentModalFlow === "cancellation"
                     ? cancellationPaymentCurrency
-                    : reschedulePaymentCurrency
+                    : reschedulePaymentDisplayCurrency
                 }
                 actionLabel={
                   paymentModalFlow === "cancellation"
