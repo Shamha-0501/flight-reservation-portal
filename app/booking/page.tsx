@@ -219,6 +219,10 @@ function formatMoneyAmount(amount: number, currency: string) {
   }).format(amount);
 }
 
+function normalizeCurrencyCode(currency?: string | null) {
+  return (currency || "USD").trim().toUpperCase();
+}
+
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
@@ -336,6 +340,10 @@ export default function BookingPage() {
     () => parseMoneyAmount(selectedFlight?.fare.total),
     [selectedFlight?.fare.total]
   );
+  const displayCurrency = useMemo(
+    () => normalizeCurrencyCode(extrasCurrency),
+    [extrasCurrency]
+  );
   const agencyMarkupAmount = useMemo(
     () => calculateAgencyMarkupAmount(fareTotalAmount ?? 0, agencyMarkupSettings),
     [agencyMarkupSettings, fareTotalAmount]
@@ -343,23 +351,23 @@ export default function BookingPage() {
   const agencyMarkupLabel = useMemo(
     () =>
       agencyMarkupAmount > 0
-        ? `${extrasCurrency} ${formatMoneyAmount(agencyMarkupAmount, extrasCurrency)}`
+        ? formatMoneyAmount(agencyMarkupAmount, displayCurrency)
         : "Included",
-    [agencyMarkupAmount, extrasCurrency]
+    [agencyMarkupAmount, displayCurrency]
   );
   const grandTotalLabel = useMemo(() => {
-    if (fareTotalAmount === null) return selectedFlight?.fare.total ?? "-";
-    return `${extrasCurrency} ${formatMoneyAmount(
+    if (fareTotalAmount === null) return selectedFlight?.fare.total ? selectedFlight.fare.total.toString() : "-";
+    return formatMoneyAmount(
       fareTotalAmount + selectedAddonsAmount + agencyMarkupAmount,
-      extrasCurrency
-    )}`;
-  }, [agencyMarkupAmount, extrasCurrency, fareTotalAmount, selectedAddonsAmount, selectedFlight?.fare.total]);
+      displayCurrency
+    );
+  }, [agencyMarkupAmount, displayCurrency, fareTotalAmount, selectedAddonsAmount, selectedFlight?.fare.total]);
   const addonsTotalLabel = useMemo(
     () =>
       selectedAddonsAmount > 0
-        ? `${extrasCurrency} ${formatMoneyAmount(selectedAddonsAmount, extrasCurrency)}`
+        ? formatMoneyAmount(selectedAddonsAmount, displayCurrency)
         : "Included",
-    [extrasCurrency, selectedAddonsAmount]
+    [displayCurrency, selectedAddonsAmount]
   );
   const stepFromQuery = useMemo(() => {
     const step = (searchParams.get("step") || "").toLowerCase();
@@ -832,7 +840,14 @@ export default function BookingPage() {
             <ReviewRow label="Agency markup" value={agencyMarkupLabel} />
             <ReviewRow
               label="Selected add-ons"
-              value={`${extrasSelection?.totalAddonsAmount ?? 0} ${extrasSelection?.currency ?? extrasCurrency}`}
+              value={
+                extrasSelection?.totalAddonsAmount
+                  ? formatMoneyAmount(
+                      extrasSelection.totalAddonsAmount,
+                      normalizeCurrencyCode(extrasSelection?.currency ?? extrasCurrency)
+                    )
+                  : "Included"
+              }
             />
           </div>
         </section>

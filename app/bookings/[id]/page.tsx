@@ -75,6 +75,30 @@ function getOrderMoney(order?: BookingListItem | null) {
   };
 }
 
+function getBookingBaseMoney(order?: BookingListItem | null) {
+  const totals = order?.amounts;
+  const candidates = [
+    totals?.order_total,
+    totals?.total,
+    totals?.grand_total,
+  ];
+
+  const selected = candidates.find(
+    (entry): entry is { amount?: string | number | null; currency?: string | null } =>
+      Boolean(entry && entry.amount != null)
+  );
+
+  return {
+    amount: selected?.amount ?? null,
+    currency:
+      selected?.currency ??
+      totals?.order_total?.currency ??
+      totals?.total?.currency ??
+      totals?.grand_total?.currency ??
+      null,
+  };
+}
+
 function getAgencyCharges(order?: BookingListItem | null) {
   const agencyMarkup = order?.meta?.agency_markup as
     | { amount?: string | number | null; currency?: string | null }
@@ -85,6 +109,8 @@ function getAgencyCharges(order?: BookingListItem | null) {
   const addonTotal = addons.reduce((sum, addon) => {
     const record = addon as Record<string, unknown>;
     const amount =
+      parseNumericAmount(record.price) ??
+      parseNumericAmount(record.amount) ??
       parseNumericAmount(record.agency_addons_amount) ??
       parseNumericAmount(record.total_addons_amount) ??
       0;
@@ -101,6 +127,8 @@ function getAgencyCharges(order?: BookingListItem | null) {
 
   return {
     amount: total > 0 ? total : null,
+    markupAmount,
+    addonAmount: addonTotal,
     currency,
   };
 }
@@ -783,12 +811,25 @@ export default function BookingDetailsPage() {
   );
   const reschedulePaymentAmount =
     getOrderChangePaymentAmount(selectedChangeOffer) ?? 0;
+  const bookingMoney = getBookingBaseMoney(order);
   const orderMoney = getOrderMoney(order);
   const agencyCharges = getAgencyCharges(order);
+  const bookingTotalAmount = parseNumericAmount(bookingMoney.amount) ?? 0;
+  const agencyChargeCurrency = agencyCharges.currency || bookingMoney.currency || orderMoney.currency || "USD";
+  const agencyMarkupLabel = formatMoneyDetails(
+    agencyCharges.markupAmount,
+    agencyChargeCurrency
+  );
+  const addonsLabel = formatMoneyDetails(
+    agencyCharges.addonAmount,
+    agencyChargeCurrency
+  );
   const agencyChargesLabel = formatMoneyDetails(
     agencyCharges.amount,
-    agencyCharges.currency || orderMoney.currency
+    agencyChargeCurrency
   );
+  const totalPaidAmount = bookingTotalAmount + (agencyCharges.markupAmount ?? 0) + (agencyCharges.addonAmount ?? 0);
+  const totalPaidLabel = formatMoneyDetails(totalPaidAmount, agencyChargeCurrency);
   const reschedulePaymentCurrency =
     selectedChangeOffer?.currency || orderMoney.currency || "USD";
 
@@ -863,17 +904,16 @@ export default function BookingDetailsPage() {
     normalizeStatusDetails(order?.cancellation_status) === "cancelled" &&
     normalizeStatusDetails(order?.refund_status) === "refund pending";
 
-  const totalAmount = formatMoneyDetails(orderMoney.amount, orderMoney.currency);
   const refundBeforeDeparture = getRefundBeforeDeparture(refundabilityStatus);
   const penaltyAmount = parseNumericAmount(refundBeforeDeparture?.penalty_amount) ?? 0;
   const penaltyCurrency =
     refundBeforeDeparture?.penalty_currency || orderMoney.currency || "USD";
-  const bookingTotalAmount = parseNumericAmount(orderMoney.amount) ?? 0;
+  const refundBaseAmount = parseNumericAmount(orderMoney.amount) ?? 0;
   const cancellationPaymentAmount =
     parseNumericAmount(cancellationQuote?.cancellation_fee) ?? penaltyAmount;
   const cancellationPaymentCurrency =
     cancellationQuote?.cancellation_fee_currency || penaltyCurrency;
-  const estimatedRefundAmount = Math.max(bookingTotalAmount - penaltyAmount, 0);
+  const estimatedRefundAmount = Math.max(refundBaseAmount - penaltyAmount, 0);
 
   const resetCancellationFlow = () => {
     setCancellationStep("status");
@@ -1302,8 +1342,14 @@ export default function BookingDetailsPage() {
       <div className="mx-auto w-full max-w-screen-xl px-4 py-6 sm:px-6 lg:py-8">
         <section className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
           <div className="bg-gradient-to-br from-blue-600 via-blue-600 to-sky-500 p-5 text-white sm:p-7">
-            <Link href="/bookings" className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold text-blue-50 backdrop-blur transition hover:bg-white/15">
-              ← Back to bookings
+            <Link
+              href="/bookings"
+              aria-label="Back to bookings"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-blue-50 backdrop-blur transition hover:bg-white/15"
+            >
+              <svg viewBox="0 0 24 24" fill="none" className="h-4.5 w-4.5" stroke="currentColor" strokeWidth="2">
+                <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </Link>
 
             <div className="mt-6 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -1321,7 +1367,7 @@ export default function BookingDetailsPage() {
 
               <div className="rounded-2xl border border-white/20 bg-white/10 px-5 py-4 backdrop-blur">
                 <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-100">Total paid</div>
-                <div className="mt-1 text-3xl font-extrabold">{totalAmount}</div>
+              <div className="mt-1 text-3xl font-extrabold">{totalPaidLabel}</div>
               </div>
             </div>
           </div>
@@ -1360,13 +1406,16 @@ export default function BookingDetailsPage() {
                   value={order.refund_status || "-"}
                 />
                 <InfoCardDetails label="Agency charges" value={agencyChargesLabel} />
-                <InfoCardDetails label="Total" value={totalAmount} />
+                <InfoCardDetails label="Total" value={totalPaidLabel} />
               </section>
 
               <SectionCard eyebrow="Reservation" title="Important dates">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <InfoCardDetails label="Created" value={formatDateDetails(order.created_at)} />
-                  <InfoCardDetails label="Void window ends" value={formatDateDetails(order.void_window_ends_at)} />
+                  <InfoCardDetails
+                    label="Void window ends"
+                    value={order.void_window_ends_at ? formatDateDetails(order.void_window_ends_at) : "Not available"}
+                  />
                 </div>
               </SectionCard>
 
@@ -1389,20 +1438,24 @@ export default function BookingDetailsPage() {
                   <div className="space-y-3 text-sm">
                     <div className="flex items-center justify-between gap-4 text-slate-600">
                       <span>Booking total</span>
-                      <span className="font-bold text-slate-950">{totalAmount}</span>
+                      <span className="font-bold text-slate-950">{formatMoneyDetails(bookingMoney.amount, bookingMoney.currency)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-4 text-slate-600">
-                      <span>Agency charges</span>
-                      <span className="font-bold text-slate-950">{agencyChargesLabel}</span>
+                      <span>Agency markup</span>
+                      <span className="font-bold text-slate-950">{agencyMarkupLabel}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 text-slate-600">
+                      <span>Add-ons</span>
+                      <span className="font-bold text-slate-950">{addonsLabel}</span>
                     </div>
                     <div className="flex items-center justify-between gap-4 text-slate-600">
                       <span>Currency</span>
-                      <span className="font-bold text-slate-950">{orderMoney.currency || "-"}</span>
+                      <span className="font-bold text-slate-950">{agencyChargeCurrency || "-"}</span>
                     </div>
                     <div className="border-t border-slate-200 pt-3">
                       <div className="flex items-center justify-between gap-4">
                         <span className="text-base font-extrabold text-slate-950">Total paid</span>
-                        <span className="text-xl font-extrabold text-blue-700">{totalAmount}</span>
+                        <span className="text-xl font-extrabold text-blue-700">{totalPaidLabel}</span>
                       </div>
                     </div>
                   </div>
@@ -1580,7 +1633,7 @@ export default function BookingDetailsPage() {
                   <div className="border-t border-slate-100 pt-3">
                     <div className="flex items-center justify-between gap-4">
                       <span className="text-sm font-semibold text-slate-500">Total</span>
-                      <span className="text-xl font-extrabold text-blue-700">{totalAmount}</span>
+                      <span className="text-xl font-extrabold text-blue-700">{totalPaidLabel}</span>
                     </div>
                   </div>
                 </div>
