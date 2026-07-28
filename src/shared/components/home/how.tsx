@@ -8,6 +8,7 @@ import {
   UserCheck,
   CreditCard,
   Check,
+  ArrowRight,
   type LucideIcon,
 } from "lucide-react";
 
@@ -132,7 +133,10 @@ export default function HowItWorksSection() {
 
         <div className="text-center mt-12">
           <button className="bg-primary-500 text-white px-10 py-4 rounded-full text-lg font-semibold hover:bg-primary-600 transition-all duration-300 hover:shadow-xl hover:scale-105">
-            Get Started Now →
+            <span className="inline-flex items-center gap-2">
+              Get Started Now
+              <ArrowRight className="h-5 w-5" aria-hidden="true" />
+            </span>
           </button>
         </div>
       </Container>

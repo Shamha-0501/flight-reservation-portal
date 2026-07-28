@@ -45,6 +45,51 @@ function buildSearchPayload(
   return searchPayload;
 }
 
+function isValidIsoDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function validateSearchParams(params: FlightSearchParams) {
+  const origin = params.origin.trim().toUpperCase();
+  const destination = params.destination.trim().toUpperCase();
+  const airportCodePattern = /^[A-Z0-9]{3}$/;
+  const totalPassengers =
+    params.adults + (params.children ?? 0) + (params.infants ?? 0);
+
+  if (!airportCodePattern.test(origin) || !airportCodePattern.test(destination)) {
+    return "Choose a valid origin and destination airport.";
+  }
+  if (origin === destination) return "Origin and destination must be different.";
+  if (!isValidIsoDate(params.departureDate)) return "Choose a valid departure date.";
+  if (params.trip === "roundtrip" && !params.returnDate) {
+    return "Choose a return date for a round trip.";
+  }
+  if (params.returnDate && !isValidIsoDate(params.returnDate)) {
+    return "Choose a valid return date.";
+  }
+  if (params.returnDate && params.returnDate < params.departureDate) {
+    return "Return date must be on or after the departure date.";
+  }
+  if (!Number.isInteger(params.adults) || params.adults < 1 || params.adults > 9) {
+    return "Choose between 1 and 9 adult passengers.";
+  }
+  if (
+    !Number.isInteger(params.children ?? 0) ||
+    (params.children ?? 0) < 0 ||
+    !Number.isInteger(params.infants ?? 0) ||
+    (params.infants ?? 0) < 0 ||
+    (params.infants ?? 0) > params.adults ||
+    totalPassengers > 9
+  ) {
+    return "Check the passenger counts before searching.";
+  }
+
+  return null;
+}
+
 function buildOffersQuery(
   offerRequestId: string,
   filters?: FlightSearchFilters
@@ -93,6 +138,9 @@ export const createFlightOfferRequest = async (
   filters?: FlightSearchFilters
 ): Promise<string> => {
   try {
+    const validationError = validateSearchParams(params);
+    if (validationError) throw new Error(validationError);
+
     const searchPayload = buildSearchPayload(params, filters);
     const offerRequestResponse = await http.post("/api/flights/search", searchPayload);
     const offerRequestId = offerRequestResponse.data?.offer_request_id;

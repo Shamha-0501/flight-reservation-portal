@@ -240,7 +240,9 @@ function BookingCard({ item }: { item: BookingListItem }) {
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Void window</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{formatDate(item.void_window_ends_at)}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {item.void_window_ends_at ? formatDate(item.void_window_ends_at) : "Not available"}
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Secure record</p>
@@ -320,7 +322,8 @@ export default function BookingsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const email = authUser?.email ?? "";
+  const email = authUser?.email?.trim() ?? "";
+  const accountEmail = email || "Signed in user";
   const authIsReady = authStatus !== "unknown" && meChecked;
 
   useEffect(() => {
@@ -472,7 +475,12 @@ export default function BookingsPage() {
                     </span>
                     <div className="min-w-0">
                       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-100">Account</div>
-                      <div className="mt-1 truncate text-sm font-semibold">{email || "Signed in user"}</div>
+                      <div
+                        className="mt-1 max-w-full whitespace-normal break-words text-sm font-semibold leading-5 text-white"
+                        title={email || accountEmail}
+                      >
+                        {accountEmail}
+                      </div>
                     </div>
                   </div>
                 </div>

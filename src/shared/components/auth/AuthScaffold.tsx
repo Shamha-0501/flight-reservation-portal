@@ -124,18 +124,21 @@ export function AuthField({
   htmlFor,
   error,
   optional = false,
+  required = false,
   children,
 }: {
   label: string;
   htmlFor: string;
   error?: string;
   optional?: boolean;
+  required?: boolean;
   children: ReactNode;
 }) {
   return (
     <label htmlFor={htmlFor} className="grid gap-1.5">
       <span className="text-sm font-semibold text-slate-700">
         {label}
+        {required ? <span className="ml-1 text-rose-500">*</span> : null}
         {optional ? <span className="ml-1 text-slate-400">optional</span> : null}
       </span>
       {children}

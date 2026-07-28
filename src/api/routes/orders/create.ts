@@ -17,6 +17,11 @@ export type OrderPassengerPayload = {
   infant_passenger_id?: string;
 };
 
+export type OrderSeatServicePayload = {
+  id: string;
+  quantity: 1;
+};
+
 export type OrderAddonPayload = {
   duffel_baggage_enabled?: boolean;
   duffel_baggage_count?: number;
@@ -89,6 +94,7 @@ export type CreateOrderRequestBody = {
   passengers: OrderPassengerPayload[];
   addons?: OrderAddonPayload;
   booking_addons?: BookingAddonSnapshot[];
+  services?: OrderSeatServicePayload[];
   agency_markup?: OrderAgencyMarkupPayload | null;
   contact_email?: string;
 };
@@ -108,6 +114,7 @@ export function buildCreateOrderRequestBody(
   passengers: OrderPassengerPayload[],
   addons?: OrderAddonPayload,
   bookingAddons?: BookingAddonSnapshot[],
+  services?: OrderSeatServicePayload[],
   agencyMarkup?: OrderAgencyMarkupPayload | null,
   contactEmail?: string
 ): CreateOrderRequestBody {
@@ -117,6 +124,7 @@ export function buildCreateOrderRequestBody(
     passengers,
     ...(addons ? { addons } : {}),
     ...(bookingAddons?.length ? { booking_addons: bookingAddons } : {}),
+    ...(services?.length ? { services } : {}),
     ...(agencyMarkup ? { agency_markup: agencyMarkup } : {}),
     ...(contactEmail ? { contact_email: contactEmail } : {}),
   };

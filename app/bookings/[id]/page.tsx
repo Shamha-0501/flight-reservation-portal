@@ -51,6 +51,36 @@ function formatMoneyDetails(
   }
 }
 
+function formatDisplayedRescheduleMoney(
+  amount?: string | number | null,
+  currency?: string | null
+): string {
+  const normalizedCurrency = String(currency ?? "").trim().toUpperCase();
+  if (amount == null) return "-";
+
+  if (normalizedCurrency === DUFFEL_SUPPLIER_CURRENCY) {
+    const numeric = Number(amount);
+    const convertedAmount = Number.isFinite(numeric) ? numeric * EUR_TO_LKR_RATE : numeric;
+    return formatMoneyDetails(convertedAmount, "LKR");
+  }
+
+  return formatMoneyDetails(amount, currency);
+}
+
+function getDisplayedRescheduleAmount(
+  amount?: number | null,
+  currency?: string | null
+): number | null {
+  if (amount == null) return null;
+
+  const normalizedCurrency = String(currency ?? "").trim().toUpperCase();
+  if (normalizedCurrency === DUFFEL_SUPPLIER_CURRENCY) {
+    return amount * EUR_TO_LKR_RATE;
+  }
+
+  return amount;
+}
+
 function getOrderMoney(order?: BookingListItem | null) {
   const totals = order?.amounts;
   const candidates = [
@@ -75,6 +105,30 @@ function getOrderMoney(order?: BookingListItem | null) {
   };
 }
 
+function getBookingBaseMoney(order?: BookingListItem | null) {
+  const totals = order?.amounts;
+  const candidates = [
+    totals?.order_total,
+    totals?.total,
+    totals?.grand_total,
+  ];
+
+  const selected = candidates.find(
+    (entry): entry is { amount?: string | number | null; currency?: string | null } =>
+      Boolean(entry && entry.amount != null)
+  );
+
+  return {
+    amount: selected?.amount ?? null,
+    currency:
+      selected?.currency ??
+      totals?.order_total?.currency ??
+      totals?.total?.currency ??
+      totals?.grand_total?.currency ??
+      null,
+  };
+}
+
 function getAgencyCharges(order?: BookingListItem | null) {
   const agencyMarkup = order?.meta?.agency_markup as
     | { amount?: string | number | null; currency?: string | null }
@@ -85,6 +139,8 @@ function getAgencyCharges(order?: BookingListItem | null) {
   const addonTotal = addons.reduce((sum, addon) => {
     const record = addon as Record<string, unknown>;
     const amount =
+      parseNumericAmount(record.price) ??
+      parseNumericAmount(record.amount) ??
       parseNumericAmount(record.agency_addons_amount) ??
       parseNumericAmount(record.total_addons_amount) ??
       0;
@@ -101,6 +157,8 @@ function getAgencyCharges(order?: BookingListItem | null) {
 
   return {
     amount: total > 0 ? total : null,
+    markupAmount,
+    addonAmount: addonTotal,
     currency,
   };
 }
@@ -354,7 +412,7 @@ function buildOrderChangeOfferView(
         "Cabin not specified"
     ),
     amountLabel,
-    amountText: formatMoneyDetails(amountValue, currency),
+    amountText: formatDisplayedRescheduleMoney(amountValue, currency),
     amountHint,
     expiresText: rawOffer.expires_at ? `Expires ${formatDateDetails(String(rawOffer.expires_at))}` : undefined,
   };
@@ -715,6 +773,289 @@ function PassengerCard({ passenger }: { passenger: NonNullable<BookingListItem["
   );
 }
 
+type SeatSelectionDetail = {
+  passengerLabel: string;
+  seatDesignator: string;
+  journeyLabel: string;
+  journeyNumber: number;
+  cabinClass?: string | null;
+  amountText: string;
+  serviceId?: string | null;
+};
+
+function SeatSelectionDetails({ order }: { order: BookingListItem }) {
+  const seatSelections = getSeatSelectionDetails(order);
+  const seatAddonSummary = getSeatAddonSummary(order);
+
+  if (!seatSelections.length && seatAddonSummary.count === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+        No seat selection details were stored for this booking.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {seatSelections.length ? (
+        <div className="grid gap-3">
+          {seatSelections.map((seat) => (
+            <div
+              key={`${seat.passengerLabel}:${seat.journeyNumber}:${seat.seatDesignator}:${seat.serviceId ?? ""}`}
+              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="text-sm font-extrabold text-slate-950">
+                    {seat.passengerLabel}
+                  </div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    {seat.journeyLabel}
+                  </div>
+                  <div className="text-sm text-slate-700">
+                    Seat <span className="font-bold text-slate-950">{seat.seatDesignator}</span>
+                  </div>
+                  <div className="text-sm text-slate-700">
+                    Cabin{" "}
+                    <span className="font-semibold text-slate-950">
+                      {seat.cabinClass || "Economy"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">
+                  {seat.amountText}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {seatAddonSummary.count ? (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+          <div className="font-bold">Seat add-on summary</div>
+          <div className="mt-1 text-blue-800">
+            {seatAddonSummary.count} seat{seatAddonSummary.count === 1 ? "" : "s"} booked
+            {seatAddonSummary.amountText ? ` · ${seatAddonSummary.amountText}` : ""}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function getSeatAddonSummary(order?: BookingListItem | null) {
+  const addons = Array.isArray(order?.addons) ? order.addons : [];
+
+  const summary = addons.reduce<{
+    count: number;
+    amount: number;
+    currency: string | null;
+  }>(
+    (acc, addon) => {
+      const record = addon as Record<string, unknown>;
+      if (!isSeatAddonRecord(record)) return acc;
+
+      acc.count += Number(record.duffel_seat_count ?? 0) || 0;
+      acc.amount += parseNumericAmount(record.duffel_seat_amount) ?? 0;
+      acc.currency =
+        typeof record.duffel_seat_currency === "string"
+          ? record.duffel_seat_currency
+          : acc.currency;
+      return acc;
+    },
+    { count: 0, amount: 0, currency: null as string | null }
+  );
+
+  return {
+    count: summary.count,
+    amountText:
+      summary.amount > 0
+        ? formatMoneyDetails(summary.amount, summary.currency || "USD")
+        : "",
+  };
+}
+
+function isSeatAddonRecord(record: Record<string, unknown>) {
+  return (
+    record.duffel_seat_enabled === true ||
+    record.duffel_seat_count != null ||
+    record.duffel_seat_amount != null
+  );
+}
+
+function getSeatSelectionDetails(order?: BookingListItem | null): SeatSelectionDetail[] {
+  const passengerLabels = new Map<string, string>();
+  const segmentJourneyNumbers = new Map<string, number>();
+  const passengerTypeCounts = new Map<string, number>();
+
+  for (const passenger of order?.passengers ?? []) {
+    const typeKey = normalizePassengerType(passenger.type);
+    const nextCount = (passengerTypeCounts.get(typeKey) ?? 0) + 1;
+    passengerTypeCounts.set(typeKey, nextCount);
+    passengerLabels.set(String(passenger.id), `${capitalizeLabel(typeKey)} ${nextCount}`);
+  }
+
+  const sources = [
+    order?.meta?.change?.latest_order_snapshot,
+    order?.meta?.duffel_order,
+    order?.meta?.offer,
+    order?.addons,
+  ];
+
+  const details = new Map<string, SeatSelectionDetail>();
+
+  for (const source of sources) {
+    collectSeatSelectionDetails(source, {
+      passengerLabels,
+      segmentJourneyNumbers,
+      details,
+    });
+  }
+
+  return Array.from(details.values());
+}
+
+function collectSeatSelectionDetails(
+  value: unknown,
+  context: {
+    passengerLabels: Map<string, string>;
+    segmentJourneyNumbers: Map<string, number>;
+    details: Map<string, SeatSelectionDetail>;
+  },
+  depth = 0
+) {
+  if (value == null || depth > 6) return;
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) =>
+      collectSeatSelectionDetails(item, context, depth + 1)
+    );
+    return;
+  }
+
+  if (typeof value !== "object") return;
+
+  const record = value as Record<string, unknown>;
+  const services = Array.isArray(record.services) ? record.services : [];
+  for (const service of services) {
+    if (!service || typeof service !== "object") continue;
+
+    const serviceRecord = service as Record<string, unknown>;
+    const serviceType = toStringValue(serviceRecord.type);
+    if (serviceType && serviceType !== "seat") continue;
+
+    const metadata = getRecordValue(serviceRecord.metadata);
+    const seatDesignator =
+      toStringValue(metadata?.designator) ??
+      toStringValue(metadata?.name) ??
+      toStringValue(serviceRecord.designator) ??
+      toStringValue(serviceRecord.seat_designator) ??
+      toStringValue(serviceRecord.seat);
+    const serviceId = toStringValue(serviceRecord.id);
+    const passengerIds = toStringArray(serviceRecord.passenger_ids);
+    const segmentIds = toStringArray(serviceRecord.segment_ids);
+    const amount =
+      parseNumericAmount(serviceRecord.total_amount) ??
+      parseNumericAmount(serviceRecord.amount) ??
+      null;
+    const currency =
+      toStringValue(serviceRecord.total_currency) ??
+      toStringValue(serviceRecord.currency) ??
+      "USD";
+    const cabinClass =
+      toStringValue(serviceRecord.cabin_class) ??
+      toStringValue(metadata?.cabin_class) ??
+      toStringValue(metadata?.cabinClass);
+
+    if (!seatDesignator) continue;
+
+    const passengerIdList = passengerIds.length ? passengerIds : [null];
+    const segmentIdList = segmentIds.length ? segmentIds : [null];
+
+    for (const passengerId of passengerIdList) {
+      for (const segmentId of segmentIdList) {
+        const journeyNumber = segmentId
+          ? getJourneyNumber(segmentId, context.segmentJourneyNumbers)
+          : 1;
+        const passengerLabel =
+          (passengerId && context.passengerLabels.get(passengerId)) || "Passenger";
+        const journeyLabel = `Journey ${journeyNumber}`;
+        const amountText =
+          amount != null && amount > 0
+            ? formatMoneyDetails(amount, currency)
+            : "Included";
+        const key = `${serviceId ?? seatDesignator}:${passengerLabel}:${journeyLabel}`;
+
+        if (!context.details.has(key)) {
+          context.details.set(key, {
+            passengerLabel,
+            seatDesignator,
+            journeyLabel,
+            journeyNumber,
+            cabinClass: formatCabinClass(cabinClass),
+            amountText,
+            serviceId,
+          });
+        }
+      }
+    }
+  }
+
+  for (const [key, nested] of Object.entries(record)) {
+    if (key === "meta" || key === "links") continue;
+    collectSeatSelectionDetails(nested, context, depth + 1);
+  }
+}
+
+function toStringValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function toStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => toStringValue(item))
+    .filter((item): item is string => Boolean(item));
+}
+
+function getRecordValue(value: unknown) {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function getJourneyNumber(
+  segmentId: string,
+  segmentJourneyNumbers: Map<string, number>
+) {
+  const existing = segmentJourneyNumbers.get(segmentId);
+  if (existing) return existing;
+
+  const nextNumber = segmentJourneyNumbers.size + 1;
+  segmentJourneyNumbers.set(segmentId, nextNumber);
+  return nextNumber;
+}
+
+function normalizePassengerType(value: unknown) {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (normalized === "adult" || normalized === "child" || normalized === "infant") {
+    return normalized;
+  }
+  return "passenger";
+}
+
+function capitalizeLabel(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatCabinClass(value?: string | null) {
+  if (!value) return "Economy";
+  const trimmed = value.trim();
+  if (!trimmed) return "Economy";
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
 export default function BookingDetailsPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -783,14 +1124,35 @@ export default function BookingDetailsPage() {
   );
   const reschedulePaymentAmount =
     getOrderChangePaymentAmount(selectedChangeOffer) ?? 0;
+  const bookingMoney = getBookingBaseMoney(order);
   const orderMoney = getOrderMoney(order);
   const agencyCharges = getAgencyCharges(order);
+  const bookingTotalAmount = parseNumericAmount(bookingMoney.amount) ?? 0;
+  const agencyChargeCurrency = agencyCharges.currency || bookingMoney.currency || orderMoney.currency || "USD";
+  const agencyMarkupLabel = formatMoneyDetails(
+    agencyCharges.markupAmount,
+    agencyChargeCurrency
+  );
+  const addonsLabel = formatMoneyDetails(
+    agencyCharges.addonAmount,
+    agencyChargeCurrency
+  );
   const agencyChargesLabel = formatMoneyDetails(
     agencyCharges.amount,
-    agencyCharges.currency || orderMoney.currency
+    agencyChargeCurrency
   );
+  const totalPaidAmount = bookingTotalAmount + (agencyCharges.markupAmount ?? 0) + (agencyCharges.addonAmount ?? 0);
+  const totalPaidLabel = formatMoneyDetails(totalPaidAmount, agencyChargeCurrency);
   const reschedulePaymentCurrency =
     selectedChangeOffer?.currency || orderMoney.currency || "USD";
+  const reschedulePaymentDisplayAmount = getDisplayedRescheduleAmount(
+    reschedulePaymentAmount,
+    reschedulePaymentCurrency
+  );
+  const reschedulePaymentDisplayCurrency =
+    String(reschedulePaymentCurrency).trim().toUpperCase() === DUFFEL_SUPPLIER_CURRENCY
+      ? "LKR"
+      : reschedulePaymentCurrency;
 
   const tenantKey = useMemo(
     () =>
@@ -863,17 +1225,16 @@ export default function BookingDetailsPage() {
     normalizeStatusDetails(order?.cancellation_status) === "cancelled" &&
     normalizeStatusDetails(order?.refund_status) === "refund pending";
 
-  const totalAmount = formatMoneyDetails(orderMoney.amount, orderMoney.currency);
   const refundBeforeDeparture = getRefundBeforeDeparture(refundabilityStatus);
   const penaltyAmount = parseNumericAmount(refundBeforeDeparture?.penalty_amount) ?? 0;
   const penaltyCurrency =
     refundBeforeDeparture?.penalty_currency || orderMoney.currency || "USD";
-  const bookingTotalAmount = parseNumericAmount(orderMoney.amount) ?? 0;
+  const refundBaseAmount = parseNumericAmount(orderMoney.amount) ?? 0;
   const cancellationPaymentAmount =
     parseNumericAmount(cancellationQuote?.cancellation_fee) ?? penaltyAmount;
   const cancellationPaymentCurrency =
     cancellationQuote?.cancellation_fee_currency || penaltyCurrency;
-  const estimatedRefundAmount = Math.max(bookingTotalAmount - penaltyAmount, 0);
+  const estimatedRefundAmount = Math.max(refundBaseAmount - penaltyAmount, 0);
 
   const resetCancellationFlow = () => {
     setCancellationStep("status");
@@ -918,14 +1279,9 @@ export default function BookingDetailsPage() {
     setPaymentModalFlow("cancellation");
   };
 
-  const openReschedulePaymentModal = () => {
-    if (!selectedChangeOfferId || !selectedChangeOffer) {
-      setRescheduleError("Select a reschedule offer before continuing.");
-      return;
-    }
-
+  const selectRescheduleOffer = (offerId: string) => {
+    setSelectedChangeOfferId(offerId);
     setRescheduleError(null);
-    setPaymentModalFlow("reschedule");
   };
 
   const openRescheduleReview = async () => {
@@ -1302,8 +1658,14 @@ export default function BookingDetailsPage() {
       <div className="mx-auto w-full max-w-screen-xl px-4 py-6 sm:px-6 lg:py-8">
         <section className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
           <div className="bg-gradient-to-br from-blue-600 via-blue-600 to-sky-500 p-5 text-white sm:p-7">
-            <Link href="/bookings" className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold text-blue-50 backdrop-blur transition hover:bg-white/15">
-              ← Back to bookings
+            <Link
+              href="/bookings"
+              aria-label="Back to bookings"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-blue-50 backdrop-blur transition hover:bg-white/15"
+            >
+              <svg viewBox="0 0 24 24" fill="none" className="h-4.5 w-4.5" stroke="currentColor" strokeWidth="2">
+                <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </Link>
 
             <div className="mt-6 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -1321,7 +1683,7 @@ export default function BookingDetailsPage() {
 
               <div className="rounded-2xl border border-white/20 bg-white/10 px-5 py-4 backdrop-blur">
                 <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-100">Total paid</div>
-                <div className="mt-1 text-3xl font-extrabold">{totalAmount}</div>
+              <div className="mt-1 text-3xl font-extrabold">{totalPaidLabel}</div>
               </div>
             </div>
           </div>
@@ -1360,13 +1722,16 @@ export default function BookingDetailsPage() {
                   value={order.refund_status || "-"}
                 />
                 <InfoCardDetails label="Agency charges" value={agencyChargesLabel} />
-                <InfoCardDetails label="Total" value={totalAmount} />
+                <InfoCardDetails label="Total" value={totalPaidLabel} />
               </section>
 
               <SectionCard eyebrow="Reservation" title="Important dates">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <InfoCardDetails label="Created" value={formatDateDetails(order.created_at)} />
-                  <InfoCardDetails label="Void window ends" value={formatDateDetails(order.void_window_ends_at)} />
+                  <InfoCardDetails
+                    label="Void window ends"
+                    value={order.void_window_ends_at ? formatDateDetails(order.void_window_ends_at) : "Not available"}
+                  />
                 </div>
               </SectionCard>
 
@@ -1384,25 +1749,33 @@ export default function BookingDetailsPage() {
                 )}
               </SectionCard>
 
+              <SectionCard eyebrow="Extras" title="Seat selection">
+                <SeatSelectionDetails order={order} />
+              </SectionCard>
+
               <SectionCard eyebrow="Payment" title="Fare breakdown">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="space-y-3 text-sm">
                     <div className="flex items-center justify-between gap-4 text-slate-600">
                       <span>Booking total</span>
-                      <span className="font-bold text-slate-950">{totalAmount}</span>
+                      <span className="font-bold text-slate-950">{formatMoneyDetails(bookingMoney.amount, bookingMoney.currency)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-4 text-slate-600">
-                      <span>Agency charges</span>
-                      <span className="font-bold text-slate-950">{agencyChargesLabel}</span>
+                      <span>Agency markup</span>
+                      <span className="font-bold text-slate-950">{agencyMarkupLabel}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 text-slate-600">
+                      <span>Add-ons</span>
+                      <span className="font-bold text-slate-950">{addonsLabel}</span>
                     </div>
                     <div className="flex items-center justify-between gap-4 text-slate-600">
                       <span>Currency</span>
-                      <span className="font-bold text-slate-950">{orderMoney.currency || "-"}</span>
+                      <span className="font-bold text-slate-950">{agencyChargeCurrency || "-"}</span>
                     </div>
                     <div className="border-t border-slate-200 pt-3">
                       <div className="flex items-center justify-between gap-4">
                         <span className="text-base font-extrabold text-slate-950">Total paid</span>
-                        <span className="text-xl font-extrabold text-blue-700">{totalAmount}</span>
+                        <span className="text-xl font-extrabold text-blue-700">{totalPaidLabel}</span>
                       </div>
                     </div>
                   </div>
@@ -1580,7 +1953,7 @@ export default function BookingDetailsPage() {
                   <div className="border-t border-slate-100 pt-3">
                     <div className="flex items-center justify-between gap-4">
                       <span className="text-sm font-semibold text-slate-500">Total</span>
-                      <span className="text-xl font-extrabold text-blue-700">{totalAmount}</span>
+                      <span className="text-xl font-extrabold text-blue-700">{totalPaidLabel}</span>
                     </div>
                   </div>
                 </div>
@@ -1775,7 +2148,7 @@ export default function BookingDetailsPage() {
                             key={offerId || offerView.route}
                             type="button"
                             onClick={() => {
-                              setSelectedChangeOfferId(offerId);
+                              selectRescheduleOffer(offerId);
                             }}
                             aria-pressed={isSelected}
                             className={`rounded-2xl border p-4 text-left transition ${
@@ -1880,14 +2253,19 @@ export default function BookingDetailsPage() {
               ) : (
                 <button
                   type="button"
-                  onClick={openReschedulePaymentModal}
+                  onClick={() => void submitRescheduleChange()}
                   disabled={
                     !selectedChangeOfferId ||
+                    confirmingReschedule ||
                     Boolean(rescheduleSuccess)
                   }
                   className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(79,70,229,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(79,70,229,0.34)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                 >
-                  {selectedChangeOfferId ? "Confirm selected offer" : "Select an offer first"}
+                  {confirmingReschedule
+                    ? "Confirming..."
+                    : selectedChangeOfferId
+                      ? "Confirm selected offer"
+                      : "Select an offer first"}
                 </button>
               )}
             </div>
@@ -2161,12 +2539,12 @@ export default function BookingDetailsPage() {
                 amountDue={
                   paymentModalFlow === "cancellation"
                     ? cancellationPaymentAmount
-                    : reschedulePaymentAmount
+                    : reschedulePaymentDisplayAmount
                 }
                 currency={
                   paymentModalFlow === "cancellation"
                     ? cancellationPaymentCurrency
-                    : reschedulePaymentCurrency
+                    : reschedulePaymentDisplayCurrency
                 }
                 actionLabel={
                   paymentModalFlow === "cancellation"

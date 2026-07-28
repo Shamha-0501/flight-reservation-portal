@@ -1,5 +1,5 @@
 import { csrf, http } from "@/src/api/config/http";
-import { getActiveAgencies } from "@/src/api/routes/tenant/agencies";
+import { getActiveAgencies, type TenantAgency } from "@/src/api/routes/tenant/agencies";
 
 export type AdminTenant = {
   id: number;
@@ -15,7 +15,9 @@ export type AdminTenant = {
   member_count?: number | null;
   meta?: {
     contact_email?: string;
+    business_email?: string;
     contact_phone?: string;
+    business_phone?: string;
     country?: string;
     industry?: string;
     [key: string]: unknown;
@@ -27,29 +29,9 @@ export type AdminTenant = {
 type TenantAction = "approve" | "reject" | "suspend" | "reactivate";
 
 export async function getAllAdminTenants(): Promise<AdminTenant[]> {
-  try {
-    const response = await http.get("/api/admin/tenants");
-    const tenants = response.data?.data ?? response.data;
+  const activeTenants = await getActiveAgencies();
 
-    if (!Array.isArray(tenants)) {
-      throw new Error("Admin tenants were not returned by the backend.");
-    }
-
-    return tenants;
-  } catch (error) {
-    const responseError = error as { response?: { status?: number } };
-
-    // Temporary fallback while the dedicated admin list endpoint is being added.
-    if (responseError.response?.status === 404) {
-      const activeTenants = await getActiveAgencies();
-      return activeTenants.map((tenant) => ({
-        ...tenant,
-        status: tenant.status ?? "active",
-      }));
-    }
-
-    throw new Error(getApiErrorMessage(error, "Failed to load agency list."));
-  }
+  return activeTenants.map(normalizeAdminTenant);
 }
 
 export async function getPendingTenants(): Promise<AdminTenant[]> {
@@ -61,7 +43,7 @@ export async function getPendingTenants(): Promise<AdminTenant[]> {
       throw new Error("Pending tenants were not returned by the backend.");
     }
 
-    return tenants;
+    return tenants.map(normalizeAdminTenant);
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Failed to load pending tenants."));
   }
@@ -93,10 +75,37 @@ async function mutateTenant(tenantId: number | string, action: TenantAction): Pr
       throw new Error("Tenant update response was not returned by the backend.");
     }
 
-    return tenant as AdminTenant;
+    return normalizeAdminTenant(tenant as AdminTenant);
   } catch (error) {
     throw new Error(getApiErrorMessage(error, `Failed to ${action} tenant.`));
   }
+}
+
+function normalizeAdminTenant(tenant: AdminTenant | TenantAgency): AdminTenant {
+  const contactEmail =
+    typeof tenant.meta?.contact_email === "string"
+      ? tenant.meta.contact_email
+      : typeof tenant.meta?.business_email === "string"
+        ? tenant.meta.business_email
+        : undefined;
+  const contactPhone =
+    typeof tenant.meta?.contact_phone === "string"
+      ? tenant.meta.contact_phone
+      : typeof tenant.meta?.business_phone === "string"
+        ? tenant.meta.business_phone
+        : undefined;
+
+  return {
+    ...tenant,
+    status: tenant.status ?? "active",
+    meta: tenant.meta
+      ? {
+          ...tenant.meta,
+          contact_email: contactEmail,
+          contact_phone: contactPhone,
+        }
+      : tenant.meta,
+  };
 }
 
 function getApiErrorMessage(error: unknown, fallback: string) {
