@@ -773,6 +773,289 @@ function PassengerCard({ passenger }: { passenger: NonNullable<BookingListItem["
   );
 }
 
+type SeatSelectionDetail = {
+  passengerLabel: string;
+  seatDesignator: string;
+  journeyLabel: string;
+  journeyNumber: number;
+  cabinClass?: string | null;
+  amountText: string;
+  serviceId?: string | null;
+};
+
+function SeatSelectionDetails({ order }: { order: BookingListItem }) {
+  const seatSelections = getSeatSelectionDetails(order);
+  const seatAddonSummary = getSeatAddonSummary(order);
+
+  if (!seatSelections.length && seatAddonSummary.count === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+        No seat selection details were stored for this booking.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {seatSelections.length ? (
+        <div className="grid gap-3">
+          {seatSelections.map((seat) => (
+            <div
+              key={`${seat.passengerLabel}:${seat.journeyNumber}:${seat.seatDesignator}:${seat.serviceId ?? ""}`}
+              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="text-sm font-extrabold text-slate-950">
+                    {seat.passengerLabel}
+                  </div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    {seat.journeyLabel}
+                  </div>
+                  <div className="text-sm text-slate-700">
+                    Seat <span className="font-bold text-slate-950">{seat.seatDesignator}</span>
+                  </div>
+                  <div className="text-sm text-slate-700">
+                    Cabin{" "}
+                    <span className="font-semibold text-slate-950">
+                      {seat.cabinClass || "Economy"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">
+                  {seat.amountText}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {seatAddonSummary.count ? (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+          <div className="font-bold">Seat add-on summary</div>
+          <div className="mt-1 text-blue-800">
+            {seatAddonSummary.count} seat{seatAddonSummary.count === 1 ? "" : "s"} booked
+            {seatAddonSummary.amountText ? ` · ${seatAddonSummary.amountText}` : ""}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function getSeatAddonSummary(order?: BookingListItem | null) {
+  const addons = Array.isArray(order?.addons) ? order.addons : [];
+
+  const summary = addons.reduce<{
+    count: number;
+    amount: number;
+    currency: string | null;
+  }>(
+    (acc, addon) => {
+      const record = addon as Record<string, unknown>;
+      if (!isSeatAddonRecord(record)) return acc;
+
+      acc.count += Number(record.duffel_seat_count ?? 0) || 0;
+      acc.amount += parseNumericAmount(record.duffel_seat_amount) ?? 0;
+      acc.currency =
+        typeof record.duffel_seat_currency === "string"
+          ? record.duffel_seat_currency
+          : acc.currency;
+      return acc;
+    },
+    { count: 0, amount: 0, currency: null as string | null }
+  );
+
+  return {
+    count: summary.count,
+    amountText:
+      summary.amount > 0
+        ? formatMoneyDetails(summary.amount, summary.currency || "USD")
+        : "",
+  };
+}
+
+function isSeatAddonRecord(record: Record<string, unknown>) {
+  return (
+    record.duffel_seat_enabled === true ||
+    record.duffel_seat_count != null ||
+    record.duffel_seat_amount != null
+  );
+}
+
+function getSeatSelectionDetails(order?: BookingListItem | null): SeatSelectionDetail[] {
+  const passengerLabels = new Map<string, string>();
+  const segmentJourneyNumbers = new Map<string, number>();
+  const passengerTypeCounts = new Map<string, number>();
+
+  for (const passenger of order?.passengers ?? []) {
+    const typeKey = normalizePassengerType(passenger.type);
+    const nextCount = (passengerTypeCounts.get(typeKey) ?? 0) + 1;
+    passengerTypeCounts.set(typeKey, nextCount);
+    passengerLabels.set(String(passenger.id), `${capitalizeLabel(typeKey)} ${nextCount}`);
+  }
+
+  const sources = [
+    order?.meta?.change?.latest_order_snapshot,
+    order?.meta?.duffel_order,
+    order?.meta?.offer,
+    order?.addons,
+  ];
+
+  const details = new Map<string, SeatSelectionDetail>();
+
+  for (const source of sources) {
+    collectSeatSelectionDetails(source, {
+      passengerLabels,
+      segmentJourneyNumbers,
+      details,
+    });
+  }
+
+  return Array.from(details.values());
+}
+
+function collectSeatSelectionDetails(
+  value: unknown,
+  context: {
+    passengerLabels: Map<string, string>;
+    segmentJourneyNumbers: Map<string, number>;
+    details: Map<string, SeatSelectionDetail>;
+  },
+  depth = 0
+) {
+  if (value == null || depth > 6) return;
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) =>
+      collectSeatSelectionDetails(item, context, depth + 1)
+    );
+    return;
+  }
+
+  if (typeof value !== "object") return;
+
+  const record = value as Record<string, unknown>;
+  const services = Array.isArray(record.services) ? record.services : [];
+  for (const service of services) {
+    if (!service || typeof service !== "object") continue;
+
+    const serviceRecord = service as Record<string, unknown>;
+    const serviceType = toStringValue(serviceRecord.type);
+    if (serviceType && serviceType !== "seat") continue;
+
+    const metadata = getRecordValue(serviceRecord.metadata);
+    const seatDesignator =
+      toStringValue(metadata?.designator) ??
+      toStringValue(metadata?.name) ??
+      toStringValue(serviceRecord.designator) ??
+      toStringValue(serviceRecord.seat_designator) ??
+      toStringValue(serviceRecord.seat);
+    const serviceId = toStringValue(serviceRecord.id);
+    const passengerIds = toStringArray(serviceRecord.passenger_ids);
+    const segmentIds = toStringArray(serviceRecord.segment_ids);
+    const amount =
+      parseNumericAmount(serviceRecord.total_amount) ??
+      parseNumericAmount(serviceRecord.amount) ??
+      null;
+    const currency =
+      toStringValue(serviceRecord.total_currency) ??
+      toStringValue(serviceRecord.currency) ??
+      "USD";
+    const cabinClass =
+      toStringValue(serviceRecord.cabin_class) ??
+      toStringValue(metadata?.cabin_class) ??
+      toStringValue(metadata?.cabinClass);
+
+    if (!seatDesignator) continue;
+
+    const passengerIdList = passengerIds.length ? passengerIds : [null];
+    const segmentIdList = segmentIds.length ? segmentIds : [null];
+
+    for (const passengerId of passengerIdList) {
+      for (const segmentId of segmentIdList) {
+        const journeyNumber = segmentId
+          ? getJourneyNumber(segmentId, context.segmentJourneyNumbers)
+          : 1;
+        const passengerLabel =
+          (passengerId && context.passengerLabels.get(passengerId)) || "Passenger";
+        const journeyLabel = `Journey ${journeyNumber}`;
+        const amountText =
+          amount != null && amount > 0
+            ? formatMoneyDetails(amount, currency)
+            : "Included";
+        const key = `${serviceId ?? seatDesignator}:${passengerLabel}:${journeyLabel}`;
+
+        if (!context.details.has(key)) {
+          context.details.set(key, {
+            passengerLabel,
+            seatDesignator,
+            journeyLabel,
+            journeyNumber,
+            cabinClass: formatCabinClass(cabinClass),
+            amountText,
+            serviceId,
+          });
+        }
+      }
+    }
+  }
+
+  for (const [key, nested] of Object.entries(record)) {
+    if (key === "meta" || key === "links") continue;
+    collectSeatSelectionDetails(nested, context, depth + 1);
+  }
+}
+
+function toStringValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function toStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => toStringValue(item))
+    .filter((item): item is string => Boolean(item));
+}
+
+function getRecordValue(value: unknown) {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function getJourneyNumber(
+  segmentId: string,
+  segmentJourneyNumbers: Map<string, number>
+) {
+  const existing = segmentJourneyNumbers.get(segmentId);
+  if (existing) return existing;
+
+  const nextNumber = segmentJourneyNumbers.size + 1;
+  segmentJourneyNumbers.set(segmentId, nextNumber);
+  return nextNumber;
+}
+
+function normalizePassengerType(value: unknown) {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (normalized === "adult" || normalized === "child" || normalized === "infant") {
+    return normalized;
+  }
+  return "passenger";
+}
+
+function capitalizeLabel(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatCabinClass(value?: string | null) {
+  if (!value) return "Economy";
+  const trimmed = value.trim();
+  if (!trimmed) return "Economy";
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
 export default function BookingDetailsPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -1464,6 +1747,10 @@ export default function BookingDetailsPage() {
                     No passenger data available for this booking.
                   </div>
                 )}
+              </SectionCard>
+
+              <SectionCard eyebrow="Extras" title="Seat selection">
+                <SeatSelectionDetails order={order} />
               </SectionCard>
 
               <SectionCard eyebrow="Payment" title="Fare breakdown">
