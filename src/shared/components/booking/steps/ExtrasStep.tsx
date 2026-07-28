@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import ExtrasIntroCard from "./components/ExtrasIntroCard";
 import FlightExtrasSection from "./components/FlightExtrasSection";
 import PolicyOptionsSection from "./components/PolicyOptionsSection";
@@ -12,6 +12,10 @@ import {
   type AgencyAddonRecord,
   type BookingAddonSnapshot,
 } from "@/src/shared/lib/agencyAddons";
+import type {
+  DuffelSeatMapResponse,
+  SeatServiceSelection,
+} from "@/src/shared/lib/seatMaps";
 import {
   buildAgencyAddonPayload,
   mapTenantSettingsToPolicies,
@@ -78,6 +82,10 @@ export type ExtrasOrderSelection = {
   selectedPolicyByGroup: Record<string, string | null>;
   selectedAddonIds: string[];
   bookingAddons: BookingAddonSnapshot[];
+  seatServices: SeatServiceSelection[];
+  seatServicesAmount: number;
+  seatServicesCount: number;
+  seatCurrency: string;
   addons: OrderAddonPayload;
   agencyAddonsAmount: number;
   duffelAddonsAmount: number;
@@ -86,8 +94,18 @@ export type ExtrasOrderSelection = {
 };
 
 type ExtrasStepProps = {
+  travellers: Array<{
+    id: string;
+    label: string;
+    type: "ADULT" | "CHILD" | "INFANT";
+    note?: string;
+  }>;
   baggageSelections: TravellerBaggage[];
   seatSelection: SeatSelectionSummary;
+  seatMaps?: DuffelSeatMapResponse | null;
+  seatMapStatus?: string;
+  seatMapLoading?: boolean;
+  seatMapError?: string | null;
   tenantAddonSettings?: TenantAddonSettings | null;
   bookingAddons?: AgencyAddonRecord[] | null;
   policies?: PolicyGroup[];
@@ -97,8 +115,13 @@ type ExtrasStepProps = {
 };
 
 export default function ExtrasStep({
+  travellers,
   baggageSelections,
   seatSelection,
+  seatMaps,
+  seatMapStatus,
+  seatMapLoading,
+  seatMapError,
   tenantAddonSettings,
   bookingAddons,
   policies: fallbackPolicies = [],
@@ -152,6 +175,40 @@ export default function ExtrasStep({
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>(
     initialSelection?.selectedAddonIds ?? []
   );
+
+  const [selectedSeatServices, setSelectedSeatServices] = useState<
+    SeatServiceSelection[]
+  >(initialSelection?.seatServices ?? []);
+  const hasHydratedSeatServicesRef = useRef(Boolean(initialSelection?.seatServices?.length));
+
+  useEffect(() => {
+    setSelectedBaggageByTraveller(
+      baggageSelections.reduce<Record<string, string>>((acc, traveller) => {
+        const initialOptionId =
+          initialSelection?.selectedBaggageByTraveller?.[traveller.travellerId];
+        const hasInitialOption = traveller.options.some(
+          (option) => option.id === initialOptionId
+        );
+
+        acc[traveller.travellerId] = traveller.options[0]?.id ?? "";
+        if (hasInitialOption && initialOptionId) {
+          acc[traveller.travellerId] = initialOptionId;
+        }
+
+        return acc;
+      }, {})
+    );
+    setSelectedPolicyByGroup(initialSelection?.selectedPolicyByGroup ?? {});
+    setSelectedAddonIds(initialSelection?.selectedAddonIds ?? []);
+  }, [baggageSelections, initialSelection]);
+
+  useEffect(() => {
+    if (hasHydratedSeatServicesRef.current) return;
+    if (!initialSelection) return;
+
+    setSelectedSeatServices(initialSelection.seatServices ?? []);
+    hasHydratedSeatServicesRef.current = true;
+  }, [initialSelection]);
 
   const toggleAddon = (id: string) => {
     setSelectedAddonIds((prev) =>
@@ -215,8 +272,14 @@ export default function ExtrasStep({
     [bookingAddonSnapshots]
   );
 
+  const seatServiceAmount = useMemo(
+    () => roundMoney(selectedSeatServices.reduce((total, seat) => total + seat.amount, 0)),
+    [selectedSeatServices]
+  );
+
   const orderAddons = useMemo<OrderAddonPayload>(() => {
     const duffelAddonsAmount = roundMoney(duffelBaggageSummary.amount);
+    const totalDuffelAmount = roundMoney(duffelAddonsAmount + seatServiceAmount);
     const agencyAddonsAmount = hasBookingAddons
       ? bookingAddonAmount
       : roundMoney(agencyAddonSummary.amount);
@@ -227,19 +290,27 @@ export default function ExtrasStep({
       duffel_baggage_amount: duffelAddonsAmount,
       duffel_baggage_currency: currency,
 
-      duffel_seat_enabled: false,
-      duffel_seat_count: 0,
-      duffel_seat_amount: 0,
+      duffel_seat_enabled: selectedSeatServices.length > 0,
+      duffel_seat_count: selectedSeatServices.length,
+      duffel_seat_amount: seatServiceAmount,
       duffel_seat_currency: currency,
 
       ...agencyAddonSummary.payload,
 
       agency_addons_amount: agencyAddonsAmount,
-      duffel_addons_amount: duffelAddonsAmount,
-      total_addons_amount: roundMoney(agencyAddonsAmount + duffelAddonsAmount),
+      duffel_addons_amount: totalDuffelAmount,
+      total_addons_amount: roundMoney(agencyAddonsAmount + totalDuffelAmount),
       currency,
     };
-  }, [agencyAddonSummary, bookingAddonAmount, currency, duffelBaggageSummary, hasBookingAddons]);
+  }, [
+    agencyAddonSummary,
+    bookingAddonAmount,
+    currency,
+    duffelBaggageSummary,
+    hasBookingAddons,
+    seatServiceAmount,
+    selectedSeatServices.length,
+  ]);
 
   useEffect(() => {
     onSelectionChange?.({
@@ -247,6 +318,10 @@ export default function ExtrasStep({
       selectedPolicyByGroup,
       selectedAddonIds,
       bookingAddons: bookingAddonSnapshots,
+      seatServices: selectedSeatServices,
+      seatServicesAmount: seatServiceAmount,
+      seatServicesCount: selectedSeatServices.length,
+      seatCurrency: currency,
       addons: orderAddons,
       agencyAddonsAmount: orderAddons.agency_addons_amount ?? 0,
       duffelAddonsAmount: orderAddons.duffel_addons_amount ?? 0,
@@ -261,6 +336,8 @@ export default function ExtrasStep({
     selectedBaggageByTraveller,
     selectedPolicyByGroup,
     bookingAddonSnapshots,
+    selectedSeatServices,
+    seatServiceAmount,
   ]);
 
   return (
@@ -271,6 +348,7 @@ export default function ExtrasStep({
       />
 
       <FlightExtrasSection
+        travellers={travellers}
         baggageSelections={baggageSelections}
         selectedBaggageByTraveller={selectedBaggageByTraveller}
         onBaggageSelect={(travellerId, optionId) => {
@@ -280,6 +358,12 @@ export default function ExtrasStep({
           }));
         }}
         seatSelection={seatSelection}
+        seatMaps={seatMaps}
+        seatMapStatus={seatMapStatus}
+        seatMapLoading={seatMapLoading}
+        seatMapError={seatMapError}
+        selectedSeatServices={selectedSeatServices}
+        onSeatServicesChange={setSelectedSeatServices}
       />
 
       <PolicyOptionsSection
