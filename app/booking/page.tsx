@@ -10,6 +10,7 @@ import {
   type CreateOrderRequestBody,
   type CreateOrderResponse,
 } from "@/src/api/routes/orders/create";
+import { fetchSeatMaps } from "@/src/api/routes/seatMaps";
 import { getBookingAvailableAddons } from "@/src/api/routes/agency/addons";
 import { getBookingMarkupSettings } from "@/src/api/routes/agency/markup";
 import BookingLayout from "@/src/shared/components/booking/BookingLayout";
@@ -36,6 +37,7 @@ import {
   normalizeAgencyMarkupSettings,
   type AgencyMarkupSettings,
 } from "@/src/shared/lib/agencyMarkup";
+import type { DuffelSeatMapResponse } from "@/src/shared/lib/seatMaps";
 import type { DuffelPaymentIntent } from "@/src/api/routes/orders/payment";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "@/src/shared/redux/store";
@@ -246,6 +248,9 @@ export default function BookingPage() {
     useState<BookingFlightViewModel | null>(null);
   const [selectedOffer, setSelectedOffer] = useState<DuffelOffer | null>(null);
   const [seatMapStatus, setSeatMapStatus] = useState<string | undefined>();
+  const [seatMaps, setSeatMaps] = useState<DuffelSeatMapResponse | null>(null);
+  const [loadingSeatMaps, setLoadingSeatMaps] = useState(false);
+  const [seatMapError, setSeatMapError] = useState<string | null>(null);
   const [loadingFlight, setLoadingFlight] = useState(false);
   const [flightError, setFlightError] = useState<string | null>(null);
   const [bookingAddons, setBookingAddons] = useState<AgencyAddonRecord[] | null>(
@@ -404,6 +409,24 @@ export default function BookingPage() {
   }, [bookingProgressStorageKey]);
 
   const seatSelection = useMemo<SeatSelectionSummary>(() => {
+    if (loadingSeatMaps) {
+      return {
+        title: "Seat selection",
+        subtitle: "Loading the seat map for this offer.",
+        ctaLabel: "Loading...",
+        available: false,
+      };
+    }
+
+    if (seatMapError) {
+      return {
+        title: "Seat selection",
+        subtitle: seatMapError,
+        ctaLabel: "Retry later",
+        available: false,
+      };
+    }
+
     const available = seatMapStatus === "available";
 
     return {
@@ -416,7 +439,7 @@ export default function BookingPage() {
       ctaLabel: available ? "Choose seats" : "Unavailable",
       available,
     };
-  }, [seatMapStatus]);
+  }, [loadingSeatMaps, seatMapError, seatMapStatus]);
 
   const orderRequestBody = useMemo(() => {
     if (!tenantKey || !offerId || !travellerOrderPayload) {
@@ -432,6 +455,10 @@ export default function BookingPage() {
       travellerOrderPayload.passengers,
       extrasSelection?.addons,
       extrasSelection?.bookingAddons,
+      extrasSelection?.seatServices.map((seat) => ({
+        id: seat.serviceId,
+        quantity: 1 as const,
+      })),
       buildAgencyMarkupSnapshot(agencyMarkupSettings, fareTotalAmount ?? 0),
       contactEmail
     );
@@ -439,6 +466,7 @@ export default function BookingPage() {
     agencyMarkupSettings,
     extrasSelection?.addons,
     extrasSelection?.bookingAddons,
+    extrasSelection?.seatServices,
     fareTotalAmount,
     offerId,
     tenantKey,
@@ -535,6 +563,9 @@ export default function BookingPage() {
       setSelectedFlight(null);
       setSelectedOffer(null);
       setSeatMapStatus(undefined);
+      setSeatMaps(null);
+      setSeatMapError(null);
+      setLoadingSeatMaps(false);
       setFlightError("Selected flight was not provided.");
       setLoadingFlight(false);
       return;
@@ -587,6 +618,44 @@ export default function BookingPage() {
     }
 
     run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [offerId]);
+
+  useEffect(() => {
+    if (!offerId) {
+      setSeatMaps(null);
+      setSeatMapError(null);
+      setLoadingSeatMaps(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function run() {
+      setLoadingSeatMaps(true);
+      setSeatMapError(null);
+
+      try {
+        const payload = await fetchSeatMaps(offerId);
+        if (!cancelled) {
+          setSeatMaps(payload);
+        }
+      } catch (error: unknown) {
+        if (!cancelled) {
+          setSeatMaps(null);
+          setSeatMapError(getErrorMessage(error, "Failed to load seat map."));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingSeatMaps(false);
+        }
+      }
+    }
+
+    void run();
 
     return () => {
       cancelled = true;
@@ -806,8 +875,13 @@ export default function BookingPage() {
 
           <ExtrasStep
             key={`${tenantKey}:${travellerKey}`}
+            travellers={travellers}
             baggageSelections={baggageSelections}
             seatSelection={seatSelection}
+            seatMaps={seatMaps}
+            seatMapStatus={seatMapStatus}
+            seatMapLoading={loadingSeatMaps}
+            seatMapError={seatMapError}
             bookingAddons={bookingAddons}
             initialSelection={extrasSelection}
             onSelectionChange={handleExtrasSelectionChange}
@@ -864,6 +938,34 @@ export default function BookingPage() {
               />
             </ReviewSection>
 
+          <div className="grid gap-3 p-5 text-sm text-slate-700 sm:p-6">
+            <ReviewRow label="Workspace ID" value={tenantKey || "-"} />
+            <ReviewRow label="Workspace key" value={tenantKey} />
+            <ReviewRow label="Offer ID" value={offerId || "-"} />
+            <ReviewRow
+              label="Passengers"
+              value={travellerOrderPayload?.passengers.length ?? 0}
+            />
+            <ReviewRow label="Agency markup" value={agencyMarkupLabel} />
+            <ReviewRow
+              label="Seat selections"
+              value={
+                extrasSelection?.seatServicesCount
+                  ? `${extrasSelection.seatServicesCount} seat${extrasSelection.seatServicesCount === 1 ? "" : "s"}`
+                  : "None"
+              }
+            />
+            <ReviewRow
+              label="Selected add-ons"
+              value={
+                extrasSelection?.totalAddonsAmount
+                  ? formatMoneyAmount(
+                      extrasSelection.totalAddonsAmount,
+                      normalizeCurrencyCode(extrasSelection?.currency ?? extrasCurrency)
+                    )
+                  : "Included"
+              }
+            />
           </div>
         </section>
       )}
