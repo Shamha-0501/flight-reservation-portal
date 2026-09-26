@@ -31,6 +31,22 @@ export type BookingListItem = {
       amount?: string | number | null;
       currency?: string | null;
     };
+    provider_total?: {
+      amount?: string | number | null;
+      currency?: string | null;
+    };
+    addons_total?: {
+      amount?: string | number | null;
+      currency?: string | null;
+    };
+    agency_markup?: {
+      amount?: string | number | null;
+      currency?: string | null;
+    };
+    customer_total?: {
+      amount?: string | number | null;
+      currency?: string | null;
+    };
   };
   user?: {
     email?: string | null;

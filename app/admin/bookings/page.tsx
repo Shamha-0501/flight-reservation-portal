@@ -159,8 +159,12 @@ export default function AdminBookingsPage() {
                   </td>
                   <td className="px-4 py-4 text-sm font-bold text-slate-950">
                     {formatMoney(
-                      booking.amounts?.total?.amount,
-                      booking.amounts?.total?.currency,
+                      booking.amounts?.customer_total?.amount ??
+                        booking.amounts?.grand_total?.amount ??
+                        booking.amounts?.total?.amount,
+                      booking.amounts?.customer_total?.currency ??
+                        booking.amounts?.grand_total?.currency ??
+                        booking.amounts?.total?.currency,
                     )}
                   </td>
                   <td className="px-4 py-4">

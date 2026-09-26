@@ -315,10 +315,14 @@ export default function AdminReschedulesPage() {
                       {workflowRows.map((row) => {
                         const bookingHref = getBookingDetailsHref(row.booking, tenantKey);
                         const amountLabel = formatMoney(
-                          row.booking.amounts?.total?.amount ??
+                          row.booking.amounts?.customer_total?.amount ??
+                            row.booking.amounts?.grand_total?.amount ??
+                            row.booking.amounts?.total?.amount ??
                             row.booking.amounts?.order_total?.amount ??
                             row.booking.amounts?.grand_total?.amount,
-                          row.booking.amounts?.total?.currency ??
+                          row.booking.amounts?.customer_total?.currency ??
+                            row.booking.amounts?.grand_total?.currency ??
+                            row.booking.amounts?.total?.currency ??
                             row.booking.amounts?.order_total?.currency ??
                             row.booking.amounts?.grand_total?.currency
                         );
@@ -627,10 +631,14 @@ function buildWorkflowRow(
     approvedAt: typeof workflow.approved_at === "string" ? workflow.approved_at : null,
     rejectedAt: typeof workflow.rejected_at === "string" ? workflow.rejected_at : null,
     amountText: formatMoney(
-      booking.amounts?.total?.amount ??
+      booking.amounts?.customer_total?.amount ??
+        booking.amounts?.grand_total?.amount ??
+        booking.amounts?.total?.amount ??
         booking.amounts?.order_total?.amount ??
         booking.amounts?.grand_total?.amount,
-      booking.amounts?.total?.currency ??
+      booking.amounts?.customer_total?.currency ??
+        booking.amounts?.grand_total?.currency ??
+        booking.amounts?.total?.currency ??
         booking.amounts?.order_total?.currency ??
         booking.amounts?.grand_total?.currency
     ),

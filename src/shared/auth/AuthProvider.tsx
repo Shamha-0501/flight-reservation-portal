@@ -92,7 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: authStatus === "authenticated",
     access,
   };
-
+  
+  // makes all those auth values available to every component underneath AuthProvider
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
@@ -104,3 +105,15 @@ export function useAuth() {
 
   return context;
 }
+
+/**
+ * Provides authentication and authorization data to the application.
+ *
+ * It reads the current auth state from Redux, resolves the user's role,
+ * tenant information, access type, and permissions, then exposes them
+ * through `AuthContext`.
+ *
+ * Components can use the `useAuth()` hook to easily access values such as
+ * the current user, selected tenant, role, authentication status,
+ * loading state, and permission checks.
+ */

@@ -36,6 +36,15 @@ export default function LoginPage() {
   }, [error]);
 
   useEffect(() => {
+    if (searchParams.get("registered") === "1") {
+      setMessage({
+        tone: "info",
+        text: "Registration successful. Please log in to continue.",
+      });
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (message || Object.keys(fieldErrors).length > 0) {
       dispatch(clearAuthError());
     }

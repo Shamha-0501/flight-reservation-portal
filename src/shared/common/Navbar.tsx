@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ToggleTheme } from "../ui/ToggleTheme";
-import { Menu, X } from "lucide-react";
-import { FaCircleUser } from "react-icons/fa6";
+import { Bell, ChevronDown, LayoutDashboard, LogOut, Menu, Plane, User, X } from "lucide-react";
 import Container from "../ui/Container";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -24,8 +23,8 @@ export const Navbar = () => {
 
   const isAuthenticated = authStatus === "authenticated";
   const access = getPostLoginAccess(user);
-  const showBookingsLink = access.kind !== "customer";
-  const dashboardTarget = access.kind === "customer" ? "/bookings" : "/admin/dashboard";
+  const showDashboardLink = access.kind === "platform" || access.kind === "tenant";
+  const userInitial = (user?.name?.trim()?.charAt(0) || user?.email?.charAt(0) || "U").toUpperCase();
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -90,63 +89,88 @@ export const Navbar = () => {
             <ToggleTheme />
 
             {isAuthenticated ? (
-              <div className="relative z-50" ref={userMenuRef}>
+              <div className="flex items-center gap-2 sm:gap-3">
                 <button
                   type="button"
-                  onClick={() => setUserMenuOpen((v) => !v)}
-                  aria-haspopup="menu"
-                  aria-expanded={userMenuOpen}
-                  className="inline-flex items-center justify-center rounded-full"
+                  aria-label="Notifications"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
                 >
-                  <FaCircleUser size={32} />
+                  <Bell className="h-4 w-4" />
                 </button>
+
+                <div className="relative z-50" ref={userMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setUserMenuOpen((v) => !v)}
+                    aria-haspopup="menu"
+                    aria-expanded={userMenuOpen}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
+                      {userInitial}
+                    </span>
+                    <span className="hidden max-w-40 truncate sm:block">
+                      {user?.name ?? "Account"}
+                    </span>
+                    <ChevronDown className="h-4 w-4 text-slate-400" />
+                  </button>
 
                 {userMenuOpen && (
                   <div
                     role="menu"
-                    className="absolute right-0 top-full z-50 mt-3 w-48 overflow-hidden rounded-xl border border-border bg-bg shadow-lg"
+                    className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
                   >
-                    <Link
-                      href={dashboardTarget}
-                      role="menuitem"
-                      className="block px-4 py-3 text-sm hover:bg-muted"
-                      onClick={() => setUserMenuOpen(false)}
-                    >
-                      Dashboard
-                    </Link>
-
-                    {showBookingsLink ? (
+                    <div className="border-b border-slate-100 px-4 py-3">
+                      <div className="truncate text-sm font-semibold text-slate-950">
+                        {user?.name ?? "Account"}
+                      </div>
+                      <div className="mt-0.5 truncate text-xs font-medium text-slate-500">
+                        {user?.email ?? ""}
+                      </div>
+                    </div>
+                    {showDashboardLink ? (
                       <Link
-                        href="/bookings"
+                        href="/admin/dashboard"
                         role="menuitem"
-                        className="block px-4 py-3 text-sm hover:bg-muted"
+                        className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                         onClick={() => setUserMenuOpen(false)}
                       >
-                        Bookings
+                        <LayoutDashboard className="h-4 w-4" />
+                        Dashboard
                       </Link>
                     ) : null}
+                    <Link
+                      href="/bookings"
+                      role="menuitem"
+                      className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <Plane className="h-4 w-4" />
+                      Bookings
+                    </Link>
 
                     <Link
                       href="/profile"
                       role="menuitem"
-                      className="block px-4 py-3 text-sm hover:bg-muted"
+                      className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                       onClick={() => setUserMenuOpen(false)}
                     >
+                      <User className="h-4 w-4" />
                       Profile
                     </Link>
-
-                    <div className="h-px bg-border" />
 
                     <button
                       type="button"
                       role="menuitem"
-                      className="w-full px-4 py-3 text-left text-sm hover:bg-muted"
+                      className="flex w-full items-center gap-2 border-t border-slate-100 px-4 py-3 text-left text-sm font-semibold text-rose-600 hover:bg-rose-50"
                       onClick={handleLogout}
                     >
+                      <LogOut className="h-4 w-4" />
                       Logout
                     </button>
                   </div>
                 )}
+                </div>
               </div>
             ) : (
               <>
@@ -223,22 +247,22 @@ export const Navbar = () => {
 
                 {isAuthenticated ? (
                   <div className="mt-4 grid gap-2">
-                    <Link
-                      href={dashboardTarget}
-                      className="w-full rounded-lg px-3 py-3 text-sm font-semibold hover:bg-muted"
-                      onClick={() => setOpen(false)}
-                    >
-                      Dashboard
-                    </Link>
-                    {showBookingsLink ? (
+                    {showDashboardLink ? (
                       <Link
-                        href="/bookings"
+                        href="/admin/dashboard"
                         className="w-full rounded-lg px-3 py-3 text-sm font-semibold hover:bg-muted"
                         onClick={() => setOpen(false)}
                       >
-                        Bookings
+                        Dashboard
                       </Link>
                     ) : null}
+                    <Link
+                      href="/bookings"
+                      className="w-full rounded-lg px-3 py-3 text-sm font-semibold hover:bg-muted"
+                      onClick={() => setOpen(false)}
+                    >
+                      Bookings
+                    </Link>
                     <Link
                       href="/profile"
                       className="w-full rounded-lg px-3 py-3 text-sm font-semibold hover:bg-muted"

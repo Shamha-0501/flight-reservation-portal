@@ -819,36 +819,51 @@ export default function BookingPage() {
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 bg-slate-50/70 px-5 py-4 sm:px-6">
             <div className="text-[12px] font-semibold uppercase tracking-[0.16em] text-blue-600">
-              Final review
+              Booking review
             </div>
             <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">
-              Ready to create order
+              Check your trip details
             </h3>
             <p className="mt-1.5 text-sm text-slate-600">
-              Check the backend order inputs before moving to card payment.
+              Please confirm the information below before moving to secure payment.
             </p>
           </div>
 
-          <div className="grid gap-3 p-5 text-sm text-slate-700 sm:p-6">
-            <ReviewRow label="Workspace ID" value={tenantKey || "-"} />
-            <ReviewRow label="Workspace key" value={tenantKey} />
-            <ReviewRow label="Offer ID" value={offerId || "-"} />
-            <ReviewRow
-              label="Passengers"
-              value={travellerOrderPayload?.passengers.length ?? 0}
-            />
-            <ReviewRow label="Agency markup" value={agencyMarkupLabel} />
-            <ReviewRow
-              label="Selected add-ons"
-              value={
-                extrasSelection?.totalAddonsAmount
-                  ? formatMoneyAmount(
-                      extrasSelection.totalAddonsAmount,
-                      normalizeCurrencyCode(extrasSelection?.currency ?? extrasCurrency)
-                    )
-                  : "Included"
-              }
-            />
+          <div className="space-y-5 p-5 sm:p-6">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">
+                Ticketing partner
+              </p>
+              <p className="mt-1 text-base font-semibold text-slate-950">{agentName}</p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ReviewSection title="Journey">
+                <ReviewRow label="Route" value={selectedFlight?.summary.route ?? "-"} />
+                <ReviewRow label="Travel date" value={selectedFlight?.summary.travelDate ?? "-"} />
+                <ReviewRow label="Duration" value={selectedFlight?.summary.duration ?? "-"} />
+                <ReviewRow label="Stops" value={selectedFlight?.summary.stops ?? "-"} />
+              </ReviewSection>
+
+              <ReviewSection title="Passengers and contact">
+                <ReviewRow label="Passengers" value={passengersLabel || "-"} />
+                <ReviewRow label="Contact email" value={travellerOrderPayload?.contact.email || "-"} />
+                <ReviewRow label="Flight segments" value={`${selectedFlight?.segments.length ?? 0}`} />
+              </ReviewSection>
+            </div>
+
+            <ReviewSection title="Baggage and extras">
+              <ReviewRow label="Baggage" value={selectedFlight?.baggageLabel ?? "-"} />
+              <ReviewRow
+                label="Selected extras"
+                value={
+                  extrasSelection?.selectedAddonIds.length
+                    ? `${extrasSelection.selectedAddonIds.length} selected`
+                    : "No additional extras"
+                }
+              />
+            </ReviewSection>
+
           </div>
         </section>
       )}
@@ -951,5 +966,20 @@ function ReviewRow({
       <span className="font-medium text-slate-500">{label}</span>
       <span className="font-semibold text-slate-950">{value}</span>
     </div>
+  );
+}
+
+function ReviewSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+      <h4 className="text-sm font-semibold text-slate-950">{title}</h4>
+      <div className="space-y-2">{children}</div>
+    </section>
   );
 }

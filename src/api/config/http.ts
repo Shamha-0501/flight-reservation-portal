@@ -40,3 +40,8 @@ http.interceptors.response.use(
     return Promise.reject(err);
   }
 );
+
+/**
+ * Configures the shared Axios client for Laravel API requests,
+ * including Sanctum cookies, CSRF protection, and API logging.
+ */

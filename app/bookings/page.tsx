@@ -9,6 +9,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/src/shared/redux/store";
@@ -39,6 +40,7 @@ function formatMoney(
 function getBookingMoney(order: BookingListItem | null | undefined) {
   const totals = order?.amounts;
   const candidates = [
+    totals?.customer_total,
     totals?.grand_total,
     totals?.order_total,
     totals?.total,
@@ -53,6 +55,7 @@ function getBookingMoney(order: BookingListItem | null | undefined) {
     amount: selected?.amount ?? null,
     currency:
       selected?.currency ??
+      totals?.customer_total?.currency ??
       totals?.grand_total?.currency ??
       totals?.order_total?.currency ??
       totals?.total?.currency ??
@@ -309,6 +312,7 @@ function BookingsSkeleton() {
 }
 
 export default function BookingsPage() {
+  const router = useRouter();
   const authUser = useSelector((s: RootState) => s.auth.user);
   const authStatus = useSelector((s: RootState) => s.auth.authStatus);
   const meChecked = useSelector((s: RootState) => s.auth.meChecked);
@@ -332,10 +336,13 @@ export default function BookingsPage() {
     }
 
     if (!email) {
+      if (authStatus === "guest") {
+        router.replace(`/login?next=${encodeURIComponent("/bookings")}`);
+        return;
+      }
+
       setError(
-        authStatus === "guest"
-          ? "Please sign in to view your booking history."
-          : "Your account email is missing, so booking history cannot be loaded.",
+        "Your account email is missing, so booking history cannot be loaded.",
       );
       setItems([]);
       setLoading(false);
@@ -375,7 +382,7 @@ export default function BookingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [authIsReady, authStatus, email, page]);
+  }, [authIsReady, authStatus, email, page, router]);
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();

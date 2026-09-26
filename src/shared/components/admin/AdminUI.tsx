@@ -188,11 +188,13 @@ export function FilterSelect({
   onChange,
   options,
   disabled = false,
+  compact = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   options: string[];
   disabled?: boolean;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -216,14 +218,16 @@ export function FilterSelect({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
-        className="inline-flex h-11 min-w-[180px] items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 outline-none transition hover:bg-white focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+        className={`inline-flex h-11 w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none transition hover:bg-white focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:opacity-60 ${
+          compact ? "min-w-0 px-3" : "min-w-[180px] px-4"
+        }`}
       >
         <span className="truncate">{value}</span>
         <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open ? (
-        <div className="absolute left-0 top-full z-20 mt-2 min-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white py-1 shadow-xl">
+        <div className="absolute left-0 top-full z-20 mt-2 max-h-60 min-w-full overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white py-1 shadow-xl">
           {options.map((option) => {
             const active = option === value;
 

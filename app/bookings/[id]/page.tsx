@@ -11,7 +11,6 @@ import {
 } from "@/src/api/routes/orders/bookings";
 import {
   confirmOrderCancellation,
-  confirmOrderRefund,
   createOrderCancellation,
   getOrderCancellation,
   getOrderRefundableStatus,
@@ -84,6 +83,7 @@ function getDisplayedRescheduleAmount(
 function getOrderMoney(order?: BookingListItem | null) {
   const totals = order?.amounts;
   const candidates = [
+    totals?.customer_total,
     totals?.grand_total,
     totals?.order_total,
     totals?.total,
@@ -98,6 +98,7 @@ function getOrderMoney(order?: BookingListItem | null) {
     amount: selected?.amount ?? null,
     currency:
       selected?.currency ??
+      totals?.customer_total?.currency ??
       totals?.grand_total?.currency ??
       totals?.order_total?.currency ??
       totals?.total?.currency ??
@@ -791,12 +792,10 @@ export default function BookingDetailsPage() {
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [, setConfirmingCancellation] = useState(false);
   const [cancellationError, setCancellationError] = useState<string | null>(null);
-  const [cancellationPayload, setCancellationPayload] = useState<Record<string, unknown> | null>(null);
   const [cancellationQuote, setCancellationQuote] =
     useState<OrderCancellationResponse["quote"] | null>(null);
   const [cancellationId, setCancellationId] = useState<string | null>(null);
   const [cancellationSuccess, setCancellationSuccess] = useState<string | null>(null);
-  const [confirmingRefund, setConfirmingRefund] = useState(false);
   const [refundabilityStatus, setRefundabilityStatus] =
     useState<OrderRefundableStatusResponse | null>(null);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -858,7 +857,11 @@ export default function BookingDetailsPage() {
     agencyCharges.amount,
     agencyChargeCurrency
   );
-  const totalPaidAmount = bookingTotalAmount + (agencyCharges.markupAmount ?? 0) + (agencyCharges.addonAmount ?? 0);
+  const totalPaidAmount =
+    parseNumericAmount(orderMoney.amount) ??
+    (bookingTotalAmount +
+      (agencyCharges.markupAmount ?? 0) +
+      (agencyCharges.addonAmount ?? 0));
   const totalPaidLabel = formatMoneyDetails(totalPaidAmount, agencyChargeCurrency);
   const reschedulePaymentCurrency =
     selectedChangeOffer?.currency || orderMoney.currency || "USD";
@@ -938,10 +941,6 @@ export default function BookingDetailsPage() {
     orderDisplayState.key === "refund-pending" ||
     orderDisplayState.key === "refund-unknown" ||
     orderDisplayState.key === "refunded";
-  const canConfirmRefund =
-    normalizeStatusDetails(order?.cancellation_status) === "cancelled" &&
-    normalizeStatusDetails(order?.refund_status) === "refund pending";
-
   const refundBeforeDeparture = getRefundBeforeDeparture(refundabilityStatus);
   const penaltyAmount = parseNumericAmount(refundBeforeDeparture?.penalty_amount) ?? 0;
   const penaltyCurrency =
@@ -957,7 +956,6 @@ export default function BookingDetailsPage() {
     setCancellationStep("status");
     setCancellationError(null);
     setCancellationSuccess(null);
-    setCancellationPayload(null);
     setCancellationQuote(null);
     setCancellationId(null);
     setRefundabilityStatus(null);
@@ -986,14 +984,37 @@ export default function BookingDetailsPage() {
     resetRescheduleFlow();
   };
 
-  const openCancellationPaymentModal = () => {
+  const openCancellationPaymentModal = async () => {
     if (!cancellationId) {
       setCancellationError("Cancellation details are incomplete.");
       return;
     }
 
     setCancellationError(null);
+
+    if (cancellationPaymentAmount <= 0) {
+      const confirmed = await runConfirmCancellation();
+      if (confirmed) {
+        closeCancellationModal();
+      }
+      return;
+    }
+
     setPaymentModalFlow("cancellation");
+  };
+
+  const openReschedulePaymentModal = () => {
+    if (!selectedChangeOfferId) {
+      setRescheduleError("Select a reschedule offer before continuing.");
+      return;
+    }
+
+    if (reschedulePaymentAmount <= 0) {
+      void submitRescheduleChange();
+      return;
+    }
+
+    setPaymentModalFlow("reschedule");
   };
 
   const selectRescheduleOffer = (offerId: string) => {
@@ -1030,12 +1051,8 @@ export default function BookingDetailsPage() {
         return;
       }
 
-      if (!isRescheduleApproved) {
-        return;
-      }
-
-    setCancellationOpen(false);
-    setCheckingReschedule(true);
+      setCancellationOpen(false);
+      setCheckingReschedule(true);
 
       const condition = await getOrderChangeableStatus(order.id);
       const normalizedCondition = getChangeBeforeDeparture(condition);
@@ -1247,13 +1264,15 @@ export default function BookingDetailsPage() {
     }
   };
 
-  const loadCancellationReview = async () => {
+  const loadCancellationReview = async (
+    intent: "request" | "action" = cancellationIntent
+  ) => {
     if (!order?.id) {
       setCancellationError("Local booking ID is missing for cancellation.");
       return;
     }
 
-    if (cancellationIntent === "request") {
+    if (intent === "request") {
       setQuoteLoading(true);
       setCancellationError(null);
       setCancellationSuccess(null);
@@ -1280,7 +1299,6 @@ export default function BookingDetailsPage() {
     }
 
     setCancellationError(null);
-    setCancellationPayload(null);
     setCancellationId(null);
     setQuoteLoading(true);
 
@@ -1294,7 +1312,6 @@ export default function BookingDetailsPage() {
             ? response.quote.cancellation_id
             : null;
 
-      setCancellationPayload(responseData);
       setCancellationQuote(response.quote ?? null);
       setCancellationId(id);
       setCancellationStep("review");
@@ -1329,8 +1346,6 @@ export default function BookingDetailsPage() {
         tenantKey,
       });
       const latest = await getOrderCancellation(cancellationId);
-      const latestData = (latest?.data ?? latest) as Record<string, unknown>;
-      setCancellationPayload(latestData);
       setCancellationQuote(latest.quote ?? null);
       setCancellationSuccess("Cancellation confirmed successfully.");
       if (bookingId && tenantKey) {
@@ -1347,26 +1362,6 @@ export default function BookingDetailsPage() {
       return false;
     } finally {
       setConfirmingCancellation(false);
-    }
-  };
-
-  const runConfirmRefund = async () => {
-    if (!order?.id) return;
-
-    setConfirmingRefund(true);
-    try {
-      await confirmOrderRefund({ orderId: order.id, tenantKey });
-      if (bookingId && tenantKey) {
-        await loadBookingDetails(bookingId, tenantKey);
-      }
-    } catch (confirmError: unknown) {
-      setCancellationError(
-        confirmError instanceof Error
-          ? confirmError.message
-          : "Failed to confirm refund."
-      );
-    } finally {
-      setConfirmingRefund(false);
     }
   };
 
@@ -1606,26 +1601,9 @@ export default function BookingDetailsPage() {
                       </div>
                     ) : null}
 
-                    {canConfirmRefund ? (
-                      <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <div className="text-sm font-bold text-sky-900">
-                              Refund pending
-                            </div>
-                            <p className="mt-1 text-sm leading-6 text-sky-800">
-                              The booking is cancelled and the refund is waiting for confirmation in the local system.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={runConfirmRefund}
-                            disabled={confirmingRefund}
-                            className="inline-flex h-10 items-center justify-center rounded-xl bg-sky-600 px-4 text-sm font-bold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {confirmingRefund ? "Confirming..." : "Mark refund confirmed"}
-                          </button>
-                        </div>
+                    {normalizeStatusDetails(order.refund_status) === "refund pending" ? (
+                      <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+                        Refund pending. The agency is processing your refund.
                       </div>
                     ) : null}
                   </div>
@@ -1918,18 +1896,6 @@ export default function BookingDetailsPage() {
                     )}
                   </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    Payment is collected in the next step so this review modal stays short.
-                  </div>
-
-                  <details className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700">
-                    <summary className="cursor-pointer font-bold text-slate-900">
-                      Raw reschedule payload
-                    </summary>
-                    <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap text-xs text-slate-700">
-                      {JSON.stringify(rescheduleRequest, null, 2)}
-                    </pre>
-                  </details>
                 </div>
               ) : null}
             </div>
@@ -1953,7 +1919,7 @@ export default function BookingDetailsPage() {
                     Boolean(rescheduleSuccess) ||
                     !rescheduleDraft ||
                     !rescheduleDraft.departureDate ||
-                    (rescheduleIntent === "action" && rescheduleCondition?.allowed === false)
+                    rescheduleCondition?.allowed === false
                   }
                   className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(79,70,229,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(79,70,229,0.34)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                 >
@@ -1966,7 +1932,7 @@ export default function BookingDetailsPage() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => void submitRescheduleChange()}
+                  onClick={openReschedulePaymentModal}
                   disabled={
                     !selectedChangeOfferId ||
                     confirmingReschedule ||
@@ -1977,7 +1943,9 @@ export default function BookingDetailsPage() {
                   {confirmingReschedule
                     ? "Confirming..."
                     : selectedChangeOfferId
-                      ? "Confirm selected offer"
+                      ? reschedulePaymentAmount > 0
+                        ? "Continue to payment"
+                        : "Confirm selected offer"
                       : "Select an offer first"}
                 </button>
               )}
@@ -1987,11 +1955,19 @@ export default function BookingDetailsPage() {
       ) : null}
 
       {cancellationOpen ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-[2px]">
-          <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-rose-100 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+        <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-slate-950/55 px-4 py-4 backdrop-blur-[2px] sm:items-center sm:py-6">
+          <div className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-rose-100 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:max-h-[calc(100vh-3rem)]">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-rose-500 via-orange-400 to-amber-300" />
 
-            <div className="border-b border-slate-100 bg-gradient-to-br from-rose-50/80 via-white to-white px-6 py-5">
+            <div className="shrink-0 border-b border-slate-100 bg-gradient-to-br from-rose-50/80 via-white to-white px-6 py-5">
+              <button
+                type="button"
+                onClick={closeCancellationModal}
+                aria-label="Close cancellation dialog"
+                className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-lg font-semibold text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
+              >
+                ×
+              </button>
               <div className="inline-flex items-center rounded-full border border-rose-100 bg-rose-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-rose-700">
                 {cancellationIntent === "request" ? "Cancellation request" : "Cancellation quote"}
               </div>
@@ -2005,7 +1981,7 @@ export default function BookingDetailsPage() {
               </p>
             </div>
 
-            <div className="space-y-4 px-6 py-6">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-6">
               {refundabilityLoading ? <BookingInlineSkeleton /> : null}
 
               {quoteLoading ? <BookingInlineSkeleton /> : null}
@@ -2026,7 +2002,9 @@ export default function BookingDetailsPage() {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                   This is a tenant approval request only. No airline cancellation will run until the request is approved.
                 </div>
-              ) : cancellationStep === "status" && !refundabilityLoading && refundBeforeDeparture ? (
+              ) : null}
+
+              {cancellationStep === "status" && !refundabilityLoading && refundBeforeDeparture ? (
                 refundBeforeDeparture.allowed ? (
                   <div className="space-y-4">
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
@@ -2037,34 +2015,25 @@ export default function BookingDetailsPage() {
                         This ticket can be cancelled before departure. Review the airline penalty and the estimated refundable amount before continuing.
                       </p>
                     </div>
-
                     <div className="grid gap-3 sm:grid-cols-2">
                       <InfoCardDetails
                         label="Penalty"
-                        value={formatMoneyDetails(
-                          refundBeforeDeparture.penalty_amount,
-                          penaltyCurrency
-                        )}
+                        value={formatMoneyDetails(refundBeforeDeparture.penalty_amount, penaltyCurrency)}
                       />
                       <InfoCardDetails
                         label="Estimated refund"
-                        value={formatMoneyDetails(
-                          estimatedRefundAmount,
-                          orderMoney.currency || penaltyCurrency
-                        )}
+                        value={formatMoneyDetails(estimatedRefundAmount, orderMoney.currency || penaltyCurrency)}
                       />
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
-                      <div className="text-sm font-bold text-rose-900">
-                        Non-refundable ticket
-                      </div>
-                      <p className="mt-1 text-sm leading-6 text-rose-800">
-                        This ticket is non-refundable. If you proceed, your booking will be cancelled and no refund will be issued.
-                      </p>
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                    <div className="text-sm font-bold text-rose-900">
+                      Cancellation eligibility is restricted
                     </div>
+                    <p className="mt-1 text-sm leading-6 text-rose-800">
+                      The fare rules mark this booking as non-refundable. You can still request a provider cancellation quote to confirm the actual refund outcome before cancelling.
+                    </p>
                   </div>
                 )
               ) : null}
@@ -2079,7 +2048,7 @@ export default function BookingDetailsPage() {
                 </div>
               ) : null}
 
-              {cancellationStep === "review" && !quoteLoading && cancellationPayload ? (
+              {cancellationStep === "review" && !quoteLoading ? (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div className="space-y-3">
                     <div>
@@ -2125,24 +2094,16 @@ export default function BookingDetailsPage() {
                         </div>
                         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800">
                           {(cancellationQuote?.warnings ?? []).map((warning) => (
-                            <li key={warning}>{warning}</li>
+                            <li key={warning}>
+                              {warning.toLowerCase().includes("non-refundable")
+                                ? "The fare rules mark this booking as non-refundable. Review the provider refund amount above before confirming."
+                                : warning}
+                            </li>
                           ))}
                         </ul>
                       </div>
                     ) : null}
 
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                      Payment is collected in the next step so this review modal stays short.
-                    </div>
-
-                    <details className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700">
-                      <summary className="cursor-pointer font-bold text-slate-900">
-                        Raw cancellation payload
-                      </summary>
-                      <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap text-xs text-slate-700">
-                        {JSON.stringify(cancellationPayload, null, 2)}
-                      </pre>
-                    </details>
                   </div>
                 </div>
               ) : null}
@@ -2155,7 +2116,7 @@ export default function BookingDetailsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-6 py-4">
+            <div className="shrink-0 flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-6 py-4">
               <button
                 type="button"
                 onClick={closeCancellationModal}
@@ -2168,7 +2129,7 @@ export default function BookingDetailsPage() {
                 cancellationIntent === "request" ? (
                   <button
                     type="button"
-                    onClick={loadCancellationReview}
+                    onClick={() => void loadCancellationReview()}
                     disabled={quoteLoading || Boolean(cancellationSuccess)}
                     className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-orange-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(225,29,72,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(225,29,72,0.34)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                   >
@@ -2178,20 +2139,20 @@ export default function BookingDetailsPage() {
                   refundBeforeDeparture.allowed ? (
                     <button
                       type="button"
-                      onClick={loadCancellationReview}
+                      onClick={() => void loadCancellationReview()}
                       disabled={refundabilityLoading || quoteLoading}
-                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(37,99,235,0.34)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(79,70,229,0.34)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                     >
                       Next
                     </button>
                   ) : (
                     <button
                       type="button"
-                      onClick={loadCancellationReview}
+                      onClick={() => void loadCancellationReview()}
                       disabled={refundabilityLoading || quoteLoading}
                       className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-orange-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(225,29,72,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(225,29,72,0.34)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                     >
-                      Cancel anyway
+                      {quoteLoading ? "Preparing..." : "Cancel anyway"}
                     </button>
                   )
                 ) : (
@@ -2216,7 +2177,7 @@ export default function BookingDetailsPage() {
       ) : null}
 
       {paymentModalFlow ? (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/70 p-4 backdrop-blur-md sm:items-center">
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/70 p-4 backdrop-blur-md sm:items-center">
           <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-5 py-4">
               <div>

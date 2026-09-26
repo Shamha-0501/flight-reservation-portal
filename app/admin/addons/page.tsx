@@ -351,111 +351,115 @@ export default function AdminAddonsPage() {
                         : "border-slate-200 bg-white hover:border-blue-200"
                     }`}
                   >
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-3 px-4 py-4 text-left sm:px-5"
-                      onClick={() =>
-                        setExpandedAddonId((current) => (current === addon.id ? null : addon.id))
-                      }
-                    >
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />
-                      )}
+                    <div className="flex items-center gap-3 px-4 py-4 sm:px-5">
+                      <button
+                        type="button"
+                        aria-label={`${isExpanded ? "Collapse" : "Expand"} ${addon.default_name}`}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                        onClick={() =>
+                          setExpandedAddonId((current) => (current === addon.id ? null : addon.id))
+                        }
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />
+                        )}
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
-                            {addon.default_name}
-                          </h3>
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                            {addon.category}
-                          </span>
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
-                              addon.is_enabled
-                                ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                                : "border border-slate-200 bg-slate-50 text-slate-500"
-                            }`}
-                          >
-                            {addon.is_enabled ? "Enabled" : "Disabled"}
-                          </span>
-                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
+                              {addon.default_name}
+                            </h3>
+                            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              {addon.category}
+                            </span>
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                                addon.is_enabled
+                                  ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                                  : "border border-slate-200 bg-slate-50 text-slate-500"
+                              }`}
+                            >
+                              {addon.is_enabled ? "Enabled" : "Disabled"}
+                            </span>
+                          </div>
 
-                        <div className="mt-1 truncate text-sm leading-6 text-slate-600">
-                          {addon.default_description}
+                          <div className="mt-1 truncate text-sm leading-6 text-slate-600">
+                            {addon.default_description}
+                          </div>
                         </div>
-                      </div>
-                    </button>
+                      </button>
+
+                      <ToggleButton
+                        checked={addon.is_enabled}
+                        disabled={isSaving}
+                        label={addon.is_enabled ? "Enabled" : "Disabled"}
+                        onClick={() =>
+                          updateAddon(addon.id, {
+                            is_enabled: !addon.is_enabled,
+                          })
+                        }
+                      />
+                    </div>
 
                     {isExpanded ? (
                       <div className="border-t border-slate-200/70 px-4 pb-4 pt-4 sm:px-5">
                         <div className="grid gap-3 sm:grid-cols-2">
                           <Field
                             label="Agency display name"
-                            value={addon.display_name ?? ""}
+                            value={addon.display_name ?? addon.default_name}
                             onChange={(value) =>
                               updateAddon(addon.id, {
                                 display_name: value,
                               })
                             }
-                            placeholder={addon.default_name}
+                            selectAllOnFocus={!addon.display_name}
                             disabled={!addon.is_enabled}
                           />
-                          <Field
-                            label="Price"
-                            value={String(addon.price ?? 0)}
-                            onChange={(value) =>
-                              updateAddon(addon.id, {
-                                price: value,
-                              })
-                            }
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            disabled={!addon.is_enabled}
-                          />
+                          <div className="flex items-end gap-3">
+                            <div className="min-w-0 flex-1">
+                              <Field
+                                label="Price"
+                                value={String(addon.price ?? 0)}
+                                onChange={(value) =>
+                                  updateAddon(addon.id, {
+                                    price: value,
+                                  })
+                                }
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                disabled={!addon.is_enabled}
+                              />
+                            </div>
+                            <div className="w-24 shrink-0 space-y-2">
+                              <label className="text-sm font-semibold text-slate-700">Currency</label>
+                              <FilterSelect
+                                value={addon.currency || "LKR"}
+                                onChange={(value) =>
+                                  updateAddon(addon.id, {
+                                    currency: value,
+                                  })
+                                }
+                                options={["LKR", "USD", "AED"]}
+                                compact
+                                disabled={!addon.is_enabled}
+                              />
+                            </div>
+                          </div>
                           <div className="sm:col-span-2">
                             <Field
                               label="Agency description"
-                              value={addon.display_description ?? ""}
+                              value={addon.display_description ?? addon.default_description}
                               onChange={(value) =>
                                 updateAddon(addon.id, {
                                   display_description: value,
                                 })
                               }
-                              placeholder={addon.default_description}
+                              selectAllOnFocus={!addon.display_description}
                               textarea
                               disabled={!addon.is_enabled}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-semibold text-slate-700">Currency</label>
-                            <FilterSelect
-                              value={addon.currency || "LKR"}
-                              onChange={(value) =>
-                                updateAddon(addon.id, {
-                                  currency: value,
-                                })
-                              }
-                              options={["LKR", "USD", "AED"]}
-                              disabled={!addon.is_enabled}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-semibold text-slate-700">
-                              Availability
-                            </label>
-                            <ToggleButton
-                              checked={addon.is_enabled}
-                              disabled={isSaving}
-                              label={addon.is_enabled ? "Enabled" : "Disabled"}
-                              onClick={() =>
-                                updateAddon(addon.id, {
-                                  is_enabled: !addon.is_enabled,
-                                })
-                              }
                             />
                           </div>
                           <div className="space-y-2">
@@ -530,6 +534,7 @@ function Field({
   step,
   textarea = false,
   disabled = false,
+  selectAllOnFocus = false,
 }: {
   label: string;
   value: string;
@@ -540,6 +545,7 @@ function Field({
   step?: string;
   textarea?: boolean;
   disabled?: boolean;
+  selectAllOnFocus?: boolean;
 }) {
   return (
     <div className="space-y-2">
@@ -548,6 +554,9 @@ function Field({
         <textarea
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onFocus={(event) => {
+            if (selectAllOnFocus) event.currentTarget.select();
+          }}
           placeholder={placeholder}
           disabled={disabled}
           rows={3}
@@ -557,6 +566,9 @@ function Field({
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onFocus={(event) => {
+            if (selectAllOnFocus) event.currentTarget.select();
+          }}
           placeholder={placeholder}
           type={type}
           min={min}

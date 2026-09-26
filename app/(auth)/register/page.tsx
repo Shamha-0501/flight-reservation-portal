@@ -51,7 +51,10 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (successMessage) {
-      const timeout = window.setTimeout(() => router.push("/login"), 1200);
+      const timeout = window.setTimeout(
+        () => router.replace("/login?registered=1"),
+        1600,
+      );
       return () => window.clearTimeout(timeout);
     }
   }, [router, successMessage]);
@@ -64,12 +67,7 @@ export default function RegisterPage() {
   }
 
   useEffect(() => {
-    if (
-      localError ||
-      error ||
-      Object.keys(fieldErrors).length > 0 ||
-      successMessage
-    ) {
+    if (localError || error || Object.keys(fieldErrors).length > 0) {
       dispatch(clearAuthError());
       setLocalError(null);
     }
