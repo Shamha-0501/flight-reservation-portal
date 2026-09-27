@@ -11,6 +11,7 @@ import {
   AuthField,
   AuthInput,
   AuthLinks,
+  AuthPasswordInput,
   AuthScaffold,
   AuthSubmit,
 } from "@/src/shared/components/auth/AuthScaffold";
@@ -77,19 +78,19 @@ export default function LoginPage() {
       title="Welcome Back"
       subtitle="Login to continue to your flight booking account or agent workspace."
       centered
-      centeredOuterMaxWidthClass="max-w-7xl"
+      centeredOuterMaxWidthClass="max-w-5xl"
       contentClassName="w-full"
     >
-      <div className="grid w-full overflow-hidden rounded-[2rem] bg-white shadow-2xl shadow-sky-100/70 lg:min-h-[760px] lg:grid-cols-2">
-        <div className="flex items-start px-6 py-8 sm:px-10 lg:px-12 lg:py-12">
-          <div className="w-full space-y-6">
+      <div className="grid w-full min-h-0 overflow-hidden rounded-[1.5rem] bg-white shadow-2xl shadow-sky-100/70 lg:h-[calc(100vh-10rem)] lg:max-h-[calc(100vh-10rem)] lg:grid-cols-2">
+        <div className="flex min-h-0 items-start px-5 py-5 sm:px-7 lg:px-8 lg:py-6">
+          <div className="w-full space-y-3">
             <AuthCardTitle
               eyebrow="Common login"
               title="Login"
               description="Use one secure sign-in flow for customers, agency teams, platform admins, and system developers."
             />
 
-            <form onSubmit={onSubmit} className="space-y-4">
+            <form onSubmit={onSubmit} className="space-y-3">
               <AuthField
                 label="Email address"
                 htmlFor="email"
@@ -103,6 +104,7 @@ export default function LoginPage() {
                   placeholder="name@example.com"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
+                  className="h-10"
                 />
               </AuthField>
 
@@ -111,7 +113,7 @@ export default function LoginPage() {
                 htmlFor="password"
                 error={fieldErrors.password?.[0]}
               >
-                <AuthInput
+                <AuthPasswordInput
                   id="password"
                   name="password"
                   type="password"
@@ -119,10 +121,11 @@ export default function LoginPage() {
                   placeholder="Enter your password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
+                  className="h-10"
                 />
               </AuthField>
 
-              <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
+              <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700">
                 <input
                   type="checkbox"
                   checked={remember}
@@ -138,23 +141,24 @@ export default function LoginPage() {
                 label="Login"
                 loadingLabel="Logging in..."
                 loading={isSubmitting}
+                className="h-10"
               />
             </form>
 
             <AuthLinks
+              inline
               links={[
                 { href: "/register", label: "Create customer account" },
                 { href: "/agency/register", label: "Register as an Agent" },
-                { href: "/forgot-password", label: "Forgot password?" },
               ]}
             />
           </div>
         </div>
 
-        <div className="relative hidden min-h-[760px] overflow-hidden bg-[linear-gradient(180deg,#dceeff_0%,#edf6ff_48%,#dcecff_100%)] lg:block">
+        <div className="relative hidden min-h-0 overflow-hidden bg-[linear-gradient(180deg,#dceeff_0%,#edf6ff_48%,#dcecff_100%)] lg:block">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.85),transparent_28%),radial-gradient(circle_at_70%_78%,rgba(255,255,255,0.5),transparent_24%)]" />
 
-          <div className="relative flex h-full items-center justify-center px-8 py-8 xl:px-10 xl:py-10">
+          <div className="relative flex h-full items-center justify-center px-6 py-6 xl:px-8 xl:py-8">
             <img
               src="/assets/images/hero/sign-up.png"
               alt="Flight booking illustration"

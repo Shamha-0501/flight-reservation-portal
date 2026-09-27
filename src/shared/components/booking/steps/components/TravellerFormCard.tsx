@@ -1,10 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import clsx from "clsx";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { Baby, UserRound, UsersRound } from "lucide-react";
+import { Baby, ChevronDown, UserRound, UsersRound } from "lucide-react";
 import type { TravellerFormValue } from "../TravellerInfoStep";
 import PreviewDropdown from "@/src/shared/ui/PreviewDropdown";
 
@@ -38,6 +38,84 @@ const TITLE_OPTIONS = [
   { value: "miss", label: "Miss." },
   { value: "mx", label: "Mx." },
 ];
+
+type DatePickerHeaderProps = {
+  date: Date;
+  decreaseMonth: () => void;
+  increaseMonth: () => void;
+  changeYear: (year: number) => void;
+};
+
+function DateOfBirthCalendarHeader({
+  date,
+  decreaseMonth,
+  increaseMonth,
+  changeYear,
+}: DatePickerHeaderProps) {
+  const [yearMenuOpen, setYearMenuOpen] = useState(false);
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 101 }, (_, index) => currentYear - index);
+
+  return (
+    <div className="relative flex items-center justify-between px-1 text-white">
+      <button
+        type="button"
+        onClick={decreaseMonth}
+        aria-label="Previous month"
+        className="flex h-7 w-7 items-center justify-center text-xl leading-none text-white/90 transition hover:text-white"
+      >
+        ‹
+      </button>
+
+      <div className="text-sm font-extrabold">
+        {date.toLocaleString(undefined, { month: "long" })}
+      </div>
+
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setYearMenuOpen((open) => !open)}
+          className="flex items-center gap-1 rounded-lg bg-white/15 px-2 py-1 text-xs font-bold text-white transition hover:bg-white/25"
+          aria-expanded={yearMenuOpen}
+        >
+          {date.getFullYear()}
+          <ChevronDown className="h-3 w-3" aria-hidden="true" />
+        </button>
+
+        {yearMenuOpen ? (
+          <div className="scrollbar-hide absolute right-0 top-full z-[300] mt-2 max-h-52 w-20 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 text-left shadow-xl">
+            {years.map((year) => (
+              <button
+                key={year}
+                type="button"
+                onClick={() => {
+                  changeYear(year);
+                  setYearMenuOpen(false);
+                }}
+                className={`block w-full rounded-lg px-2 py-1.5 text-left text-xs font-semibold transition ${
+                  year === date.getFullYear()
+                    ? "bg-blue-600 text-white"
+                    : "text-slate-700 hover:bg-blue-50 hover:text-blue-700"
+                }`}
+              >
+                {year}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <button
+        type="button"
+        onClick={increaseMonth}
+        aria-label="Next month"
+        className="flex h-7 w-7 items-center justify-center text-xl leading-none text-white/90 transition hover:text-white"
+      >
+        ›
+      </button>
+    </div>
+  );
+}
 
 const GENDER_OPTIONS = [
   { value: "m", label: "Male" },
@@ -203,9 +281,9 @@ export default function TravellerFormCard({
                     dateFormat="dd/MM/yyyy"
                     placeholderText="Select date of birth"
                     maxDate={new Date()}
-                    showMonthDropdown
-                    showYearDropdown
-                    dropdownMode="select"
+                    renderCustomHeader={(props) => (
+                      <DateOfBirthCalendarHeader {...props} />
+                    )}
                     className={withErrorClass("born_on")}
                     wrapperClassName="block w-full"
                     popperClassName="z-[9999]"

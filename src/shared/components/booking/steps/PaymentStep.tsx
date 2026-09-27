@@ -41,6 +41,7 @@ export default function PaymentStep({
   );
   const [loadingIntent, setLoadingIntent] = useState(false);
   const [confirmingIntent, setConfirmingIntent] = useState(false);
+  const [creatingBooking, setCreatingBooking] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<
     string | null
@@ -56,7 +57,7 @@ export default function PaymentStep({
   useEffect(() => {
     if (!offerId) {
       setPaymentIntent(null);
-      setPaymentError("Selected offer is missing for payment.");
+      setPaymentError("The selected flight is missing. Please return and choose a flight again.");
       return;
     }
 
@@ -76,7 +77,7 @@ export default function PaymentStep({
       } catch (error: unknown) {
         if (!cancelled) {
           setPaymentIntent(null);
-          setPaymentError(getErrorMessage(error, "Failed to initialise payment."));
+          setPaymentError(getErrorMessage(error, "We could not prepare the payment form. Please try again."));
         }
       } finally {
         if (!cancelled) {
@@ -94,36 +95,38 @@ export default function PaymentStep({
 
   const handlePaymentFailure = (error: StripeError) => {
     setPaymentSuccessMessage(null);
-    setPaymentError(error.message || "Card payment failed.");
+    setCreatingBooking(false);
+    setPaymentError("We could not process your payment. Please check your card details and try again.");
   };
 
   const handlePaymentSuccess = async () => {
     if (!paymentIntent?.id) {
-      setPaymentError("Payment intent was not ready for confirmation.");
+      setPaymentError("The payment form is not ready yet. Please wait a moment and try again.");
       return;
     }
 
     setConfirmingIntent(true);
     setPaymentError(null);
+    setPaymentSuccessMessage(null);
 
     try {
       const confirmedIntent = await confirmPaymentIntent(paymentIntent.id);
       setPaymentIntent(confirmedIntent);
-      setPaymentSuccessMessage("Card payment was confirmed.");
+      setConfirmingIntent(false);
+      setCreatingBooking(true);
 
       try {
         await onPaymentConfirmed?.(confirmedIntent);
-        setPaymentSuccessMessage("Card payment was confirmed and the order was created.");
-      } catch (orderError: unknown) {
+        setPaymentSuccessMessage("Your booking has been confirmed successfully.");
+      } catch {
         setPaymentError(
-          getErrorMessage(
-            orderError,
-            "Payment was confirmed, but order creation failed."
-          )
+          "Your payment was received, but we could not confirm your booking. Please contact support before trying again."
         );
+      } finally {
+        setCreatingBooking(false);
       }
     } catch (error: unknown) {
-      setPaymentError(getErrorMessage(error, "Payment confirmation failed."));
+      setPaymentError("We could not confirm your payment. Please check your details and try again.");
     } finally {
       setConfirmingIntent(false);
     }
@@ -141,9 +144,8 @@ export default function PaymentStep({
             Pay with card
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
-            Card details are collected securely by Duffel. After a successful
-            card payment, we will confirm the payment intent before creating the
-            booking.
+            Card details are collected securely. After payment, we will confirm
+            your booking and show your reservation details.
           </p>
         </div>
       </section>
@@ -207,7 +209,13 @@ export default function PaymentStep({
 
           {confirmingIntent ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-              Confirming the payment intent with Duffel...
+              Confirming your payment securely...
+            </div>
+          ) : null}
+
+          {creatingBooking ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              Payment received. We&apos;re confirming your booking...
             </div>
           ) : null}
 
@@ -222,7 +230,7 @@ export default function PaymentStep({
           ) : null}
 
           {paymentIntent?.status === "succeeded" ? (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <div className="hidden">
               <div className="font-semibold text-slate-900">
                 Confirmed payment intent
               </div>

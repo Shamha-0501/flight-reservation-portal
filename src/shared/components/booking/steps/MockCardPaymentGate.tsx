@@ -16,13 +16,14 @@ type MockCardPaymentGateProps = {
   description: string;
   amountDue: number | null;
   currency?: string | null;
+  errorMessage?: string | null;
   actionLabel?: string;
   onPaid?: (receipt: MockCardPaymentReceipt) => void | Promise<void>;
 };
 
 function formatMoney(amount: number, currency: string) {
   try {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("en-LK", {
       style: "currency",
       currency: currency || "USD",
     }).format(amount);
@@ -40,13 +41,14 @@ export default function MockCardPaymentGate({
   title,
   description,
   amountDue,
-  currency = "USD",
+  currency = "LKR",
+  errorMessage = null,
   actionLabel = "Validate payment",
   onPaid,
 }: MockCardPaymentGateProps) {
   const resolvedCurrency = currency ?? "USD";
   const [cardholderName, setCardholderName] = useState("");
-  const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
+  const [cardNumber, setCardNumber] = useState("");
   const [expiryMonth, setExpiryMonth] = useState("");
   const [expiryYear, setExpiryYear] = useState("");
   const [cvc, setCvc] = useState("");
@@ -68,13 +70,13 @@ export default function MockCardPaymentGate({
     event.preventDefault();
 
     if (amountDue == null) {
-      setPaymentError("Payment failed: penalty amount is unavailable.");
+      setPaymentError("The amount due is unavailable. Please try again.");
       return;
     }
 
     const enteredAmount = parseMoneyInput(amountInput);
     if (enteredAmount == null) {
-      setPaymentError("Payment failed: enter the penalty amount to continue.");
+      setPaymentError("Enter the payment amount to continue.");
       return;
     }
 
@@ -83,7 +85,7 @@ export default function MockCardPaymentGate({
     if (enteredCents !== expectedCents) {
       const difference = Math.abs(expectedCents - enteredCents) / 100;
       setPaymentError(
-        `Payment failed: enter the exact penalty amount of ${formatMoney(
+        `Enter the exact amount of ${formatMoney(
           amountDue,
           resolvedCurrency
         )}. Difference: ${formatMoney(difference, resolvedCurrency)}.`
@@ -99,34 +101,32 @@ export default function MockCardPaymentGate({
     const currentMonth = currentDate.getMonth() + 1;
 
     if (!cardholderName.trim()) {
-      setPaymentError("Payment failed: enter the cardholder name.");
+      setPaymentError("Enter the cardholder name.");
       return;
     }
 
-    if (cleanedCardNumber !== "4242424242424242") {
-      setPaymentError(
-        "Payment failed: use the dummy card number 4242 4242 4242 4242."
-      );
+    if (!/^\d{13,19}$/.test(cleanedCardNumber)) {
+      setPaymentError("Enter a valid card number.");
       return;
     }
 
     if (!Number.isInteger(cardMonth) || cardMonth < 1 || cardMonth > 12) {
-      setPaymentError("Payment failed: enter a valid expiry month.");
+      setPaymentError("Enter a valid expiry month.");
       return;
     }
 
     if (!Number.isInteger(cardYear) || cardYear < currentYear) {
-      setPaymentError("Payment failed: the card expiry date is invalid.");
+      setPaymentError("The card expiry date is invalid.");
       return;
     }
 
     if (cardYear === currentYear && cardMonth < currentMonth) {
-      setPaymentError("Payment failed: the card has expired.");
+      setPaymentError("The card has expired.");
       return;
     }
 
     if (!/^\d{3,4}$/.test(cvc)) {
-      setPaymentError("Payment failed: enter a valid CVC.");
+      setPaymentError("Enter a valid CVC.");
       return;
     }
 
@@ -138,7 +138,7 @@ export default function MockCardPaymentGate({
         amount: amountDue,
         currency: resolvedCurrency,
         cardBrand: "Visa",
-        cardLast4: "4242",
+        cardLast4: cleanedCardNumber.slice(-4),
         paidAt: new Date().toISOString(),
       };
       setPaymentReceipt(receipt);
@@ -149,10 +149,10 @@ export default function MockCardPaymentGate({
   };
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-b-[2rem] bg-white">
       <div className="border-b border-slate-200 bg-slate-50/70 px-5 py-4 sm:px-6">
         <div className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-600">
-          Mock payment gateway
+            Payment step
         </div>
         <h3 className="mt-1.5 text-2xl font-bold tracking-tight text-slate-950">
           {title}
@@ -173,8 +173,14 @@ export default function MockCardPaymentGate({
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
+        {errorMessage ? (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+            {errorMessage}
+          </div>
+        ) : null}
+
+        <div className="grid gap-4 sm:grid-cols-6">
+          <label className="block sm:col-span-3">
             <span className="text-sm font-semibold text-slate-700">Cardholder name</span>
             <input
               value={cardholderName}
@@ -185,19 +191,19 @@ export default function MockCardPaymentGate({
             />
           </label>
 
-          <label className="block">
+          <label className="block sm:col-span-3">
             <span className="text-sm font-semibold text-slate-700">Card number</span>
             <input
               value={cardNumber}
               onChange={(event) => setCardNumber(event.target.value)}
               type="text"
               inputMode="numeric"
-              placeholder="4242 4242 4242 4242"
+              placeholder="Enter card number"
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </label>
 
-          <label className="block">
+          <label className="block sm:col-span-2">
             <span className="text-sm font-semibold text-slate-700">Expiry month</span>
             <input
               value={expiryMonth}
@@ -209,7 +215,7 @@ export default function MockCardPaymentGate({
             />
           </label>
 
-          <label className="block">
+          <label className="block sm:col-span-2">
             <span className="text-sm font-semibold text-slate-700">Expiry year</span>
             <input
               value={expiryYear}
@@ -221,7 +227,7 @@ export default function MockCardPaymentGate({
             />
           </label>
 
-          <label className="block">
+          <label className="block sm:col-span-2">
             <span className="text-sm font-semibold text-slate-700">CVC</span>
             <input
               value={cvc}
@@ -233,16 +239,21 @@ export default function MockCardPaymentGate({
             />
           </label>
 
-          <label className="block sm:col-span-2">
+          <label className="block sm:col-span-6">
             <span className="text-sm font-semibold text-slate-700">Payment amount</span>
-            <input
-              value={amountInput}
-              onChange={(event) => setAmountInput(event.target.value)}
-              type="text"
-              inputMode="decimal"
-              placeholder="0.00"
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
+            <div className="relative mt-1">
+              <input
+                value={amountInput}
+                onChange={(event) => setAmountInput(event.target.value)}
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-16 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
+                {resolvedCurrency}
+              </span>
+            </div>
             <p className="mt-1 text-xs text-slate-500">
               Use the exact due amount shown above or the payment will fail.
             </p>
@@ -257,9 +268,6 @@ export default function MockCardPaymentGate({
           >
             {processing ? "Checking payment..." : actionLabel}
           </button>
-          <div className="text-xs text-slate-500">
-            Test card: 4242 4242 4242 4242
-          </div>
         </div>
 
         {paymentError ? (

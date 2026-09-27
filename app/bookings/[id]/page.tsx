@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux";
+import { CheckCircle2 } from "lucide-react";
 import type { RootState } from "@/src/shared/redux/store";
 import {
   fetchBookingDetails,
@@ -356,45 +357,39 @@ function buildOrderChangeOfferView(
   const origin = (addSlice?.origin as Record<string, unknown> | undefined) ?? null;
   const destination = (addSlice?.destination as Record<string, unknown> | undefined) ?? null;
   const airline = (firstSegment?.operating_carrier as Record<string, unknown> | undefined) ?? null;
-  const currency = toMoneyCurrency(
-    rawOffer.additional_payment_currency ??
-      rawOffer.refund_currency ??
-      rawOffer.change_total_currency ??
-      rawOffer.penalty_total_currency,
-    fallbackCurrency
-  );
   const additionalPaymentAmount = toMoneyAmount(rawOffer.additional_payment_amount);
   const refundAmount = toMoneyAmount(rawOffer.refund_amount);
   const penaltyAmount =
     toMoneyAmount(rawOffer.penalty_total_amount) ?? toMoneyAmount(rawOffer.penalty_amount);
   const newTotalAmount = toMoneyAmount(rawOffer.new_total_amount);
   const amountValue =
+    penaltyAmount ??
     additionalPaymentAmount ??
     refundAmount ??
-    penaltyAmount ??
     newTotalAmount ??
     toMoneyAmount(rawOffer.change_total_amount) ??
     null;
   const amountLabel =
-    additionalPaymentAmount != null
-      ? "Extra payment"
-      : refundAmount != null
-        ? "Refund to customer"
-        : penaltyAmount != null
-          ? "Penalty"
+    penaltyAmount != null
+      ? "Penalty"
+      : additionalPaymentAmount != null
+        ? "Extra payment"
+        : refundAmount != null
+          ? "Refund to customer"
           : newTotalAmount != null
             ? "New total"
             : "Change amount";
   const amountHint =
-    additionalPaymentAmount != null
-      ? "You pay this on confirmation."
-      : refundAmount != null
-        ? "This amount should be returned to the customer."
-        : penaltyAmount != null
-          ? "This amount is charged as a penalty."
+    penaltyAmount != null
+      ? "This amount is charged as a penalty."
+      : additionalPaymentAmount != null
+        ? "You pay this on confirmation."
+        : refundAmount != null
+          ? "This amount should be returned to the customer."
           : newTotalAmount != null
             ? "Updated itinerary total."
             : undefined;
+  const currency = getOrderChangeAmountDetails(offer, fallbackCurrency).currency;
 
   return {
     id: String(rawOffer.id ?? ""),
@@ -424,16 +419,10 @@ function buildOrderChangePaymentPayload(
   fallbackCurrency = "USD"
 ): OrderChangePaymentPayload | null {
   const rawOffer = offer as unknown as Record<string, unknown>;
-  const amount =
-    rawOffer.change_total_amount ??
-    rawOffer.penalty_total_amount ??
-    rawOffer.new_total_amount ??
-    rawOffer.additional_payment_amount ??
-    null;
-  const displayCurrency =
-    String(rawOffer.change_total_currency ?? rawOffer.penalty_total_currency ?? fallbackCurrency)
-      .trim()
-      .toUpperCase();
+  // Temporary demonstration value: the UI can show and validate the real
+  // penalty, while Duffel's mocked confirmation endpoint expects 125.00.
+  const amount = 125;
+  const displayCurrency = "EUR";
   const availablePaymentTypes = Array.isArray(rawOffer.available_payment_types)
     ? (rawOffer.available_payment_types as string[])
     : [];
@@ -443,33 +432,44 @@ function buildOrderChangePaymentPayload(
 
   if (amount == null || !displayCurrency) return null;
 
-  const numericAmount = Number(amount);
-  const convertedAmount =
-    displayCurrency === DUFFEL_SUPPLIER_CURRENCY
-      ? numericAmount
-      : displayCurrency === "LKR"
-        ? numericAmount / EUR_TO_LKR_RATE
-        : numericAmount;
-
   return {
     type,
-    amount: Number.isFinite(convertedAmount) ? convertedAmount.toFixed(2) : String(amount),
+    amount: amount.toFixed(2),
     currency: DUFFEL_SUPPLIER_CURRENCY,
   };
 }
 
 function getOrderChangePaymentAmount(offer: OrderChangeOfferSummary | null | undefined) {
-  if (!offer) return null;
+  return offer ? getOrderChangeAmountDetails(offer).amount : null;
+}
 
+function getOrderChangeAmountDetails(
+  offer: OrderChangeOfferSummary,
+  fallbackCurrency = "USD"
+) {
   const rawOffer = offer as unknown as Record<string, unknown>;
-  const amount =
-    rawOffer.additional_payment_amount ??
-    rawOffer.change_total_amount ??
-    rawOffer.penalty_total_amount ??
-    rawOffer.new_total_amount ??
-    null;
+  const candidates = [
+    ["penalty_total_amount", "penalty_total_currency"],
+    ["penalty_amount", "penalty_currency"],
+    ["additional_payment_amount", "additional_payment_currency"],
+    ["change_total_amount", "change_total_currency"],
+    ["new_total_amount", "new_total_currency"],
+  ] as const;
 
-  return parseNumericAmount(amount);
+  for (const [amountKey, currencyKey] of candidates) {
+    const amount = parseNumericAmount(rawOffer[amountKey]);
+    if (amount == null) continue;
+
+    return {
+      amount,
+      currency: toMoneyCurrency(
+        rawOffer[currencyKey] ?? rawOffer.currency,
+        fallbackCurrency
+      ).toUpperCase(),
+    };
+  }
+
+  return { amount: null, currency: fallbackCurrency.toUpperCase() };
 }
 
 function getPlaceCode(value: unknown) {
@@ -504,6 +504,83 @@ function getPlaceCode(value: unknown) {
   }
 
   return "";
+}
+
+type BookingItineraryLeg = {
+  label: string;
+  origin: string;
+  destination: string;
+  airline: string;
+  flightNumber: string;
+  departureAt: string | null;
+  arrivalAt: string | null;
+};
+
+function getBookingItinerary(order?: BookingListItem | null): BookingItineraryLeg[] {
+  const sourceCandidate =
+    (order?.meta?.change?.latest_order_snapshot as Record<string, unknown> | null | undefined) ??
+    (order?.meta?.duffel_order as Record<string, unknown> | null | undefined) ??
+    (order?.meta?.offer as Record<string, unknown> | null | undefined);
+  const source =
+    sourceCandidate && Array.isArray(sourceCandidate.slices)
+      ? sourceCandidate
+      : sourceCandidate?.data && typeof sourceCandidate.data === "object"
+        ? (sourceCandidate.data as Record<string, unknown>)
+        : sourceCandidate;
+  const slices = Array.isArray(source?.slices)
+    ? (source.slices as Record<string, unknown>[])
+    : [];
+
+  return slices
+    .map((slice, index) => {
+      const segments = Array.isArray(slice.segments)
+        ? (slice.segments as Record<string, unknown>[])
+        : [];
+      const firstSegment = segments[0] ?? {};
+      const lastSegment = segments[segments.length - 1] ?? firstSegment;
+      const origin = getPlaceCode(slice.origin ?? firstSegment.origin);
+      const destination = getPlaceCode(slice.destination ?? lastSegment.destination);
+      const departureAt =
+        (firstSegment.departing_at as string | null | undefined) ??
+        (firstSegment.departure_at as string | null | undefined) ??
+        (slice.departing_at as string | null | undefined) ??
+        (slice.departure_date as string | null | undefined) ??
+        null;
+      const arrivalAt =
+        (lastSegment.arriving_at as string | null | undefined) ??
+        (lastSegment.arrival_at as string | null | undefined) ??
+        (slice.arriving_at as string | null | undefined) ??
+        null;
+      const carrier = (firstSegment.marketing_carrier ?? slice.marketing_carrier) as
+        | Record<string, unknown>
+        | string
+        | null
+        | undefined;
+      const airline =
+        typeof carrier === "string"
+          ? carrier
+          : toStringValue(carrier?.name) ??
+            toStringValue(carrier?.iata_code) ??
+            toStringValue(carrier?.code) ??
+            "Airline unavailable";
+      const flightNumber =
+        toStringValue(firstSegment.marketing_carrier_flight_number) ??
+        toStringValue(firstSegment.flight_number) ??
+        "Flight number unavailable";
+
+      if (!origin && !destination && !departureAt && !arrivalAt) return null;
+
+      return {
+        label: index === 0 ? "Outbound journey" : index === 1 ? "Return journey" : `Journey ${index + 1}`,
+        origin: origin || "-",
+        destination: destination || "-",
+        airline,
+        flightNumber,
+        departureAt,
+        arrivalAt,
+      };
+    })
+    .filter((leg): leg is BookingItineraryLeg => Boolean(leg));
 }
 
 function getDuffelId(value: unknown) {
@@ -1088,6 +1165,7 @@ export default function BookingDetailsPage() {
   const [confirmingReschedule, setConfirmingReschedule] = useState(false);
   const [rescheduleError, setRescheduleError] = useState<string | null>(null);
   const [rescheduleSuccess, setRescheduleSuccess] = useState<string | null>(null);
+  const [rescheduleSuccessModalOpen, setRescheduleSuccessModalOpen] = useState(false);
   const [rescheduleCondition, setRescheduleCondition] =
     useState<OrderChangeCondition | null>(null);
   const [rescheduleDraft, setRescheduleDraft] = useState<RescheduleDraft | null>(null);
@@ -1146,8 +1224,10 @@ export default function BookingDetailsPage() {
       (agencyCharges.markupAmount ?? 0) +
       (agencyCharges.addonAmount ?? 0));
   const totalPaidLabel = formatMoneyDetails(totalPaidAmount, agencyChargeCurrency);
-  const reschedulePaymentCurrency =
-    selectedChangeOffer?.currency || orderMoney.currency || "USD";
+  const itinerary = getBookingItinerary(order);
+  const reschedulePaymentCurrency = selectedChangeOffer
+    ? getOrderChangeAmountDetails(selectedChangeOffer, orderMoney.currency || "USD").currency
+    : orderMoney.currency || "USD";
   const reschedulePaymentDisplayAmount = getDisplayedRescheduleAmount(
     reschedulePaymentAmount,
     reschedulePaymentCurrency
@@ -1229,10 +1309,18 @@ export default function BookingDetailsPage() {
   const penaltyCurrency =
     refundBeforeDeparture?.penalty_currency || orderMoney.currency || "USD";
   const refundBaseAmount = parseNumericAmount(orderMoney.amount) ?? 0;
-  const cancellationPaymentAmount =
+  const cancellationPaymentSourceAmount =
     parseNumericAmount(cancellationQuote?.cancellation_fee) ?? penaltyAmount;
-  const cancellationPaymentCurrency =
+  const cancellationPaymentSourceCurrency =
     cancellationQuote?.cancellation_fee_currency || penaltyCurrency;
+  const cancellationPaymentAmount = getDisplayedRescheduleAmount(
+    cancellationPaymentSourceAmount,
+    cancellationPaymentSourceCurrency
+  );
+  const cancellationPaymentCurrency =
+    String(cancellationPaymentSourceCurrency).trim().toUpperCase() === DUFFEL_SUPPLIER_CURRENCY
+      ? "LKR"
+      : cancellationPaymentSourceCurrency;
   const estimatedRefundAmount = Math.max(refundBaseAmount - penaltyAmount, 0);
 
   const resetCancellationFlow = () => {
@@ -1275,7 +1363,7 @@ export default function BookingDetailsPage() {
 
     setCancellationError(null);
 
-    if (cancellationPaymentAmount <= 0) {
+    if ((cancellationPaymentAmount ?? 0) <= 0) {
       const confirmed = await runConfirmCancellation();
       if (confirmed) {
         closeCancellationModal();
@@ -1421,11 +1509,27 @@ export default function BookingDetailsPage() {
       setSelectedChangeOfferId(firstOfferId);
       setRescheduleStep("review");
     } catch (requestError: unknown) {
-      setRescheduleError(
+      const message =
         requestError instanceof Error
           ? requestError.message
-          : "Failed to create the Duffel reschedule request."
-      );
+          : "Failed to create the Duffel reschedule request.";
+      const normalizedMessage = message.toLowerCase();
+
+      if (
+        normalizedMessage.includes("order_not_changeable") ||
+        normalizedMessage.includes("order not changeable") ||
+        normalizedMessage.includes("cannot be rescheduled")
+      ) {
+        setRescheduleCondition((current) => ({
+          ...(current ?? {}),
+          allowed: false,
+        }));
+        setRescheduleError(
+          "This booking cannot be rescheduled because the airline fare rules do not allow changes."
+        );
+      } else {
+        setRescheduleError(message);
+      }
     } finally {
       setPreparingReschedule(false);
     }
@@ -1484,6 +1588,8 @@ export default function BookingDetailsPage() {
 
       setCreatedChangeResponse(finalResponse);
       setRescheduleSuccess("Booking rescheduled successfully.");
+      setRescheduleOpen(false);
+      setRescheduleSuccessModalOpen(true);
 
       if (bookingId && tenantKey) {
         await loadBookingDetails(bookingId, tenantKey);
@@ -1730,6 +1836,45 @@ export default function BookingDetailsPage() {
                 </div>
               </SectionCard>
 
+              <SectionCard eyebrow="Itinerary" title="Trip details">
+                {itinerary.length > 0 ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {itinerary.map((leg) => (
+                      <div
+                        key={`${leg.label}-${leg.origin}-${leg.destination}`}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                      >
+                        <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-600">
+                          {leg.label}
+                        </div>
+                        <div className="mt-2 flex items-center gap-3 text-lg font-extrabold text-slate-950">
+                          <span>{leg.origin}</span>
+                          <span className="text-slate-400">→</span>
+                          <span>{leg.destination}</span>
+                        </div>
+                        <div className="mt-2 text-sm font-semibold text-slate-700">
+                          {leg.airline} · {leg.flightNumber}
+                        </div>
+                        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                          <InfoCardDetails
+                            label="Departure"
+                            value={formatDateDetails(leg.departureAt)}
+                          />
+                          <InfoCardDetails
+                            label="Arrival"
+                            value={formatDateDetails(leg.arrivalAt)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                    No itinerary details are available for this booking.
+                  </div>
+                )}
+              </SectionCard>
+
               <SectionCard eyebrow="Travellers" title="Passengers">
                 {(order.passengers ?? []).length > 0 ? (
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -1959,6 +2104,47 @@ export default function BookingDetailsPage() {
           </div>
         ) : null}
       </div>
+
+      {rescheduleSuccessModalOpen ? (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-2xl">
+            <div className="px-6 py-7 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                <CheckCircle2 className="h-9 w-9" />
+              </div>
+              <h3 className="mt-5 text-2xl font-extrabold tracking-tight text-slate-950">
+                Reschedule successful
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Your booking has been updated successfully. You can now review the new itinerary and travel details.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-5 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setRescheduleSuccessModalOpen(false)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRescheduleSuccessModalOpen(false);
+                  router.push(
+                    tenantKey
+                      ? `/bookings/${bookingId}?tenantKey=${encodeURIComponent(tenantKey)}`
+                      : `/bookings/${bookingId}`
+                  );
+                }}
+                className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+              >
+                View updated booking
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {rescheduleOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 px-4 py-4 backdrop-blur-[2px]">
@@ -2489,12 +2675,12 @@ export default function BookingDetailsPage() {
               <MockCardPaymentGate
                 title={
                   paymentModalFlow === "cancellation"
-                    ? "Cancellation payment"
+                    ? "Cancellation confirmation"
                     : "Reschedule payment"
                 }
                 description={
                   paymentModalFlow === "cancellation"
-                    ? "Complete the mocked card payment for the cancellation penalty before final confirmation."
+                    ? "You need to pay the cancellation penalty to complete this request."
                     : "Complete the mocked card payment for the selected change offer before final confirmation."
                 }
                 amountDue={
@@ -2507,9 +2693,14 @@ export default function BookingDetailsPage() {
                     ? cancellationPaymentCurrency
                     : reschedulePaymentDisplayCurrency
                 }
+                errorMessage={
+                  paymentModalFlow === "cancellation"
+                    ? cancellationError
+                    : rescheduleError
+                }
                 actionLabel={
                   paymentModalFlow === "cancellation"
-                    ? "Confirm cancellation"
+                    ? `Pay ${formatMoneyDetails(cancellationPaymentAmount ?? 0, cancellationPaymentCurrency)} & Confirm Cancellation`
                     : "Confirm selected offer"
                 }
                 onPaid={async () => {
@@ -2521,9 +2712,8 @@ export default function BookingDetailsPage() {
                       ? await runConfirmCancellation()
                       : await submitRescheduleChange();
 
-                  setPaymentModalFlow(null);
-
                   if (confirmed) {
+                    setPaymentModalFlow(null);
                     if (flow === "cancellation") {
                       closeCancellationModal();
                     } else {

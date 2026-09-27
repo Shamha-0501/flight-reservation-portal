@@ -31,6 +31,8 @@ type ReviewFlightStepProps = {
     taxes: string;
     total: string;
   };
+  seatMapStatus?: string;
+  seatMapLoading?: boolean;
 };
 
 export default function ReviewFlightStep({
@@ -38,7 +40,20 @@ export default function ReviewFlightStep({
   segments,
   baggageLabel,
   fare,
+  seatMapStatus,
+  seatMapLoading = false,
 }: ReviewFlightStepProps) {
+  const seatLabel = seatMapLoading
+    ? "Checking seat availability..."
+    : seatMapStatus === "available" || seatMapStatus === "view_only"
+      ? "Seat selection available"
+      : "Seat selection unavailable";
+  const seatLabelClass = seatMapLoading
+    ? "border-slate-200 bg-slate-50 text-slate-600"
+    : seatMapStatus === "available" || seatMapStatus === "view_only"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : "border-amber-200 bg-amber-50 text-amber-700";
+
   return (
     <div className="space-y-6">
       <FlightSummaryCard
@@ -60,7 +75,12 @@ export default function ReviewFlightStep({
               </div>
             </div>
 
-            <BaggageInfoBadge label={baggageLabel} />
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <BaggageInfoBadge label={baggageLabel} />
+              <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${seatLabelClass}`}>
+                {seatLabel}
+              </span>
+            </div>
           </div>
         </div>
 

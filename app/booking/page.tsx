@@ -184,17 +184,17 @@ function buildBaggageSelections(
         {
           id: "bag-10",
           label: "Add extra 10kg",
-          description: "Additional checked baggage allowance",
-          price: formatCurrencyAmount(35, currency),
-          amount: 35,
+          description: "Additional checked baggage allowance (estimated)",
+          price: formatCurrencyAmount(15000, currency),
+          amount: 15000,
           currency,
         },
         {
           id: "bag-20",
           label: "Add extra 20kg",
-          description: "Additional checked baggage allowance",
-          price: formatCurrencyAmount(60, currency),
-          amount: 60,
+          description: "Additional checked baggage allowance (estimated)",
+          price: formatCurrencyAmount(30000, currency),
+          amount: 30000,
           currency,
         },
       ],
@@ -421,7 +421,8 @@ export default function BookingPage() {
     if (seatMapError) {
       return {
         title: "Seat selection",
-        subtitle: seatMapError,
+        subtitle:
+          "Seat selection is currently unavailable for this offer. You can continue without choosing a seat.",
         ctaLabel: "Retry later",
         available: false,
       };
@@ -772,8 +773,10 @@ export default function BookingPage() {
         setCreatedOrder(response);
       } catch (error: unknown) {
         const message = getErrorMessage(error, "Order creation failed.");
-        setOrderCreationError(message);
-        throw new Error(`Payment was confirmed, but order creation failed: ${message}`);
+        setOrderCreationError(
+          "Your payment was received, but we could not confirm your booking. Please contact support before trying again."
+        );
+        throw new Error(message);
       } finally {
         setCreatingOrder(false);
       }
@@ -837,6 +840,8 @@ export default function BookingPage() {
               segments={selectedFlight.segments}
               baggageLabel={selectedFlight.baggageLabel}
               fare={selectedFlight.fare}
+              seatMapStatus={seatMapStatus}
+              seatMapLoading={loadingSeatMaps}
             />
           ) : null}
         </>
@@ -928,63 +933,49 @@ export default function BookingPage() {
 
             <ReviewSection title="Baggage and extras">
               <ReviewRow label="Baggage" value={selectedFlight?.baggageLabel ?? "-"} />
+              <ReviewRow label="Agency markup" value={agencyMarkupLabel} />
               <ReviewRow
-                label="Selected extras"
+                label="Additional add-ons"
                 value={
                   extrasSelection?.selectedAddonIds.length
-                    ? `${extrasSelection.selectedAddonIds.length} selected`
-                    : "No additional extras"
+                    ? `${extrasSelection.selectedAddonIds.length} selected · ${formatMoneyAmount(
+                        extrasSelection.totalAddonsAmount,
+                        normalizeCurrencyCode(extrasSelection.currency ?? extrasCurrency)
+                      )}`
+                    : "None selected"
                 }
               />
             </ReviewSection>
 
-          <div className="grid gap-3 p-5 text-sm text-slate-700 sm:p-6">
-            <ReviewRow label="Workspace ID" value={tenantKey || "-"} />
-            <ReviewRow label="Workspace key" value={tenantKey} />
-            <ReviewRow label="Offer ID" value={offerId || "-"} />
-            <ReviewRow
-              label="Passengers"
-              value={travellerOrderPayload?.passengers.length ?? 0}
-            />
-            <ReviewRow label="Agency markup" value={agencyMarkupLabel} />
-            <ReviewRow
-              label="Seat selections"
-              value={
-                extrasSelection?.seatServicesCount
-                  ? `${extrasSelection.seatServicesCount} seat${extrasSelection.seatServicesCount === 1 ? "" : "s"}`
-                  : "None"
-              }
-            />
-            <ReviewRow
-              label="Selected add-ons"
-              value={
-                extrasSelection?.totalAddonsAmount
-                  ? formatMoneyAmount(
-                      extrasSelection.totalAddonsAmount,
-                      normalizeCurrencyCode(extrasSelection?.currency ?? extrasCurrency)
-                    )
-                  : "Included"
-              }
-            />
-          </div>
+            <ReviewSection title="Selected seats">
+              {extrasSelection?.seatServices?.length ? (
+                extrasSelection.seatServices.map((seat) => {
+                  const traveller = travellers.find(
+                    (item) => item.id === seat.passengerId
+                  );
+                  const seatPrice = formatMoneyAmount(
+                    seat.amount,
+                    normalizeCurrencyCode(seat.currency)
+                  );
+
+                  return (
+                    <ReviewRow
+                      key={`${seat.passengerId}:${seat.segmentId}:${seat.serviceId}`}
+                      label={traveller?.label ?? "Passenger"}
+                      value={`${seat.seatDesignator} · ${seatPrice}`}
+                    />
+                  );
+                })
+              ) : (
+                <ReviewRow label="Seats" value="None selected" />
+              )}
+            </ReviewSection>
           </div>
         </section>
       )}
 
       {currentStepIndex === 4 && (
         <div className="space-y-4">
-          {creatingOrder ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-              Creating backend order...
-            </div>
-          ) : null}
-
-          {orderCreationError ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-              {orderCreationError}
-            </div>
-          ) : null}
-
           <PaymentStep
             offerId={offerId}
             amountLabel={grandTotalLabel}

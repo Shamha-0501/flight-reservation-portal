@@ -14,6 +14,7 @@ import {
   AuthField,
   AuthInput,
   AuthLinks,
+  AuthPasswordInput,
   AuthScaffold,
   AuthSubmit,
 } from "@/src/shared/components/auth/AuthScaffold";
@@ -182,7 +183,7 @@ export default function RegisterPage() {
                   htmlFor="password"
                   error={fieldErrors.password?.[0]}
                 >
-                  <AuthInput
+                  <AuthPasswordInput
                     id="password"
                     type="password"
                     autoComplete="new-password"
@@ -198,7 +199,7 @@ export default function RegisterPage() {
                   htmlFor="password_confirmation"
                   error={fieldErrors.password_confirmation?.[0]}
                 >
-                  <AuthInput
+                  <AuthPasswordInput
                     id="password_confirmation"
                     type="password"
                     autoComplete="new-password"

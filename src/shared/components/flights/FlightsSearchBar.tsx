@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRightLeft, CalendarDays, Search } from "lucide-react";
+import DatePicker from "react-datepicker";
 import { useAirport } from "@/src/api/hooks/duffel/useAirport";
 import TripTypeSelector from "@/src/shared/components/home/flight-search/TripTypeSelector";
 import type { TripType } from "@/src/shared/components/home/flight-search/types";
@@ -42,6 +43,27 @@ const CABIN_OPTIONS = CABINS.map((cabin) => ({
   value: cabin.value,
   label: cabin.label,
 }));
+
+function parseDateValue(value: string) {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  if (![year, month, day].every(Number.isFinite)) return null;
+  return new Date(year, month - 1, day);
+}
+
+function formatDateValue(value: Date | null) {
+  if (!value) return "";
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function startOfToday() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
 
 function InputShell({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -482,25 +504,39 @@ export default function FlightsSearchBar() {
 
         <InputShell label="Depart">
           <CalendarDays size={16} className="text-white/55" />
-          <input
-            type="date"
-            className="w-full bg-transparent text-sm text-white outline-none"
-            value={searchForm.depart}
-            onChange={(e) => setSearchForm((s) => ({ ...s, depart: e.target.value }))}
+          <DatePicker
+            selected={parseDateValue(searchForm.depart)}
+            onChange={(date: Date | null) => {
+              const depart = formatDateValue(date);
+              setSearchForm((s) => ({
+                ...s,
+                depart,
+                return: s.return && s.return < depart ? "" : s.return,
+              }));
+            }}
+            minDate={startOfToday()}
+            dateFormat="EEE, d MMM yyyy"
+            placeholderText="Select date"
+            popperClassName="z-[200]"
+            className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/50"
           />
         </InputShell>
 
         <InputShell label="Return">
           <CalendarDays size={16} className="text-white/55" />
-          <input
-            type="date"
-            min={searchForm.depart || undefined}
+          <DatePicker
+            selected={parseDateValue(searchForm.return)}
+            onChange={(date: Date | null) =>
+              setSearchForm((s) => ({ ...s, return: formatDateValue(date) }))
+            }
+            minDate={parseDateValue(searchForm.depart) ?? startOfToday()}
             disabled={searchForm.tripType === "oneway"}
-            className={`w-full bg-transparent text-sm text-white outline-none ${
+            dateFormat="EEE, d MMM yyyy"
+            placeholderText="Select date"
+            popperClassName="z-[200]"
+            className={`w-full bg-transparent text-sm text-white outline-none placeholder:text-white/50 ${
               searchForm.tripType === "oneway" ? "cursor-not-allowed opacity-60" : ""
             }`}
-            value={searchForm.return}
-            onChange={(e) => setSearchForm((s) => ({ ...s, return: e.target.value }))}
           />
         </InputShell>
 

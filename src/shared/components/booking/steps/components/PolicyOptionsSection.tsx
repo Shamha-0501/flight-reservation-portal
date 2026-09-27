@@ -15,6 +15,8 @@ export default function PolicyOptionsSection({
   selectedPolicyByGroup,
   onPolicySelect,
 }: PolicyOptionsSectionProps) {
+  if (policies.length === 0) return null;
+
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 bg-slate-50/70 px-5 py-4 sm:px-6">
@@ -29,24 +31,16 @@ export default function PolicyOptionsSection({
         </p>
       </div>
 
-      {policies.length === 0 ? (
-        <div className="p-5 sm:p-6">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-            No cancellation or change protection is available for this workspace.
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-4 p-5 sm:p-6">
-          {policies.map((policy) => (
-            <PolicyOptionGroup
-              key={policy.id}
-              {...policy}
-              selectedOptionId={selectedPolicyByGroup[policy.id] ?? null}
-              onSelect={(optionId) => onPolicySelect(policy.id, optionId)}
-            />
-          ))}
-        </div>
-      )}
+      <div className="space-y-4 p-5 sm:p-6">
+        {policies.map((policy) => (
+          <PolicyOptionGroup
+            key={policy.id}
+            {...policy}
+            selectedOptionId={selectedPolicyByGroup[policy.id] ?? null}
+            onSelect={(optionId) => onPolicySelect(policy.id, optionId)}
+          />
+        ))}
+      </div>
     </section>
   );
 }

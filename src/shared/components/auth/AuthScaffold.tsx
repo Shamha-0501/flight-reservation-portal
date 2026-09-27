@@ -1,6 +1,10 @@
 "use client";
 
+"use client";
+
 import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
+import { useState } from "react";
 import PreviewDropdown, {
   type PreviewDropdownOption,
 } from "@/src/shared/ui/PreviewDropdown";
@@ -156,6 +160,31 @@ export function AuthInput(props: InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
+export function AuthPasswordInput(
+  props: InputHTMLAttributes<HTMLInputElement>,
+) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="relative">
+      <AuthInput
+        {...props}
+        type={visible ? "text" : "password"}
+        className={`w-full pr-12 ${props.className ?? ""}`.trim()}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible((current) => !current)}
+        aria-label={visible ? "Hide password" : "Show password"}
+        title={visible ? "Hide password" : "Show password"}
+        className="absolute inset-y-0 right-0 inline-flex w-11 items-center justify-center text-slate-500 transition hover:text-slate-800"
+      >
+        {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+  );
+}
+
 export function AuthTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
@@ -194,16 +223,18 @@ export function AuthSubmit({
   label,
   loadingLabel,
   loading,
+  className,
 }: {
   label: string;
   loadingLabel: string;
   loading: boolean;
+  className?: string;
 }) {
   return (
     <button
       type="submit"
       disabled={loading}
-      className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(2,132,199,0.22)] transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+      className={`inline-flex h-12 w-full items-center justify-center rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(2,132,199,0.22)] transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60 ${className ?? ""}`.trim()}
     >
       {loading ? loadingLabel : label}
     </button>
@@ -212,11 +243,13 @@ export function AuthSubmit({
 
 export function AuthLinks({
   links,
+  inline = false,
 }: {
   links: Array<{ href: string; label: string }>;
+  inline?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-2 pt-1 text-sm">
+    <div className={`${inline ? "flex flex-wrap items-center gap-x-5 gap-y-2" : "flex flex-col gap-2"} pt-1 text-sm`}>
       {links.map((link) => (
         <Link
           key={link.href + link.label}
