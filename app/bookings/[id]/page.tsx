@@ -110,6 +110,7 @@ function getOrderMoney(order?: BookingListItem | null) {
 function getBookingBaseMoney(order?: BookingListItem | null) {
   const totals = order?.amounts;
   const candidates = [
+    totals?.booking_total,
     totals?.order_total,
     totals?.total,
     totals?.grand_total,
@@ -132,6 +133,27 @@ function getBookingBaseMoney(order?: BookingListItem | null) {
 }
 
 function getAgencyCharges(order?: BookingListItem | null) {
+  const amountSummary = order?.amounts;
+  const summaryMarkupAmount = parseNumericAmount(amountSummary?.agency_markup?.amount);
+  const summaryAddonAmount = parseNumericAmount(amountSummary?.addons_total?.amount);
+  const summaryCurrency =
+    amountSummary?.agency_markup?.currency ??
+    amountSummary?.addons_total?.currency ??
+    amountSummary?.total?.currency ??
+    null;
+
+  if (summaryMarkupAmount != null || summaryAddonAmount != null) {
+    const markupAmount = summaryMarkupAmount ?? 0;
+    const addonAmount = summaryAddonAmount ?? 0;
+
+    return {
+      amount: markupAmount + addonAmount > 0 ? markupAmount + addonAmount : null,
+      markupAmount,
+      addonAmount,
+      currency: summaryCurrency,
+    };
+  }
+
   const agencyMarkup = order?.meta?.agency_markup as
     | { amount?: string | number | null; currency?: string | null }
     | null
@@ -516,6 +538,11 @@ type BookingItineraryLeg = {
   arrivalAt: string | null;
 };
 
+type TicketDocument = {
+  passengerIds: string[];
+  uniqueIdentifier: string;
+};
+
 function getBookingItinerary(order?: BookingListItem | null): BookingItineraryLeg[] {
   const sourceCandidate =
     (order?.meta?.change?.latest_order_snapshot as Record<string, unknown> | null | undefined) ??
@@ -581,6 +608,62 @@ function getBookingItinerary(order?: BookingListItem | null): BookingItineraryLe
       };
     })
     .filter((leg): leg is BookingItineraryLeg => Boolean(leg));
+}
+
+function getTicketDocuments(order?: BookingListItem | null): TicketDocument[] {
+  const sources = [
+    order?.meta?.change?.latest_order_snapshot,
+    order?.meta?.duffel_order,
+    order?.meta?.offer,
+  ];
+
+  const documents = new Map<string, TicketDocument>();
+
+  for (const sourceCandidate of sources) {
+    const source =
+      sourceCandidate && typeof sourceCandidate === "object"
+        ? "data" in sourceCandidate &&
+          sourceCandidate.data &&
+          typeof sourceCandidate.data === "object"
+          ? (sourceCandidate.data as Record<string, unknown>)
+          : (sourceCandidate as Record<string, unknown>)
+        : null;
+
+    const sourceDocuments = Array.isArray(source?.documents)
+      ? (source.documents as Record<string, unknown>[])
+      : [];
+
+    for (const document of sourceDocuments) {
+      const type = toStringValue(document.type);
+      const uniqueIdentifier = toStringValue(document.unique_identifier);
+      if (type !== "electronic_ticket" || !uniqueIdentifier) continue;
+
+      const passengerIds = toStringArray(document.passenger_ids);
+      const key = `${uniqueIdentifier}:${passengerIds.join(",")}`;
+      if (!documents.has(key)) {
+        documents.set(key, { passengerIds, uniqueIdentifier });
+      }
+    }
+  }
+
+  return Array.from(documents.values());
+}
+
+function getPassengerTicketNumbers(
+  passenger: NonNullable<BookingListItem["passengers"]>[number],
+  documents: TicketDocument[]
+) {
+  const passengerIds = [
+    passenger.id != null ? String(passenger.id) : "",
+    toStringValue((passenger as Record<string, unknown>).duffel_passenger_id) ?? "",
+    toStringValue((passenger as Record<string, unknown>).passenger_id) ?? "",
+  ].filter(Boolean);
+
+  const matchingDocuments = documents.filter((document) =>
+    document.passengerIds.some((id) => passengerIds.includes(id))
+  );
+
+  return matchingDocuments.map((document) => document.uniqueIdentifier);
 }
 
 function getDuffelId(value: unknown) {
@@ -828,7 +911,13 @@ function BookingTimeline({
   );
 }
 
-function PassengerCard({ passenger }: { passenger: NonNullable<BookingListItem["passengers"]>[number] }) {
+function PassengerCard({
+  passenger,
+  ticketNumbers,
+}: {
+  passenger: NonNullable<BookingListItem["passengers"]>[number];
+  ticketNumbers: string[];
+}) {
   const name = `${passenger.title ? `${passenger.title} ` : ""}${passenger.given_name ?? ""} ${passenger.family_name ?? ""}`.trim();
 
   return (
@@ -838,6 +927,12 @@ function PassengerCard({ passenger }: { passenger: NonNullable<BookingListItem["
           <div className="text-sm font-extrabold text-slate-950">{name || "Passenger"}</div>
           <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
             {passenger.type || "passenger"}
+          </div>
+          <div className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Ticket number
+          </div>
+          <div className="mt-1 break-all text-sm font-extrabold text-slate-950">
+            {ticketNumbers.length ? ticketNumbers.join(", ") : "Not issued yet"}
           </div>
         </div>
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-blue-600 shadow-sm">
@@ -1225,6 +1320,7 @@ export default function BookingDetailsPage() {
       (agencyCharges.addonAmount ?? 0));
   const totalPaidLabel = formatMoneyDetails(totalPaidAmount, agencyChargeCurrency);
   const itinerary = getBookingItinerary(order);
+  const ticketDocuments = getTicketDocuments(order);
   const reschedulePaymentCurrency = selectedChangeOffer
     ? getOrderChangeAmountDetails(selectedChangeOffer, orderMoney.currency || "USD").currency
     : orderMoney.currency || "USD";
@@ -1803,7 +1899,7 @@ export default function BookingDetailsPage() {
             <div className="space-y-5">
               <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <InfoCardDetails label="Reference" value={order.booking_reference || "-"} />
-                <InfoCardDetails label="Duffel Order ID" value={order.duffel_order_id || "-"} />
+                <InfoCardDetails label="Provider booking ID" value={order.duffel_order_id || "-"} />
                 <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                   <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Status</div>
                   <div className="mt-2">
@@ -1879,7 +1975,14 @@ export default function BookingDetailsPage() {
                 {(order.passengers ?? []).length > 0 ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     {order.passengers?.map((passenger) => (
-                      <PassengerCard key={passenger.id} passenger={passenger} />
+                      <PassengerCard
+                        key={passenger.id}
+                        passenger={passenger}
+                        ticketNumbers={getPassengerTicketNumbers(
+                          passenger,
+                          ticketDocuments
+                        )}
+                      />
                     ))}
                   </div>
                 ) : (
