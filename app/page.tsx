@@ -1,14 +1,9 @@
 import AgentSection from "@/src/shared/components/home/AgentSection";
-import ChooseYourPerfectJourney from "@/src/shared/components/home/choose";
 import FeatureSection from "@/src/shared/components/home/FeatureSection";
 import Hero from "@/src/shared/components/home/hero";
 import HowItWorks from "@/src/shared/components/home/how";
-import GetAFreeQuote from "@/src/shared/components/home/quote";
 import WhatTravelersSay from "@/src/shared/components/home/tesimonials";
-import TrendingDestinations from "@/src/shared/components/home/trending";
-import Why from "@/src/shared/components/home/why";
 import Footer from "@/src/shared/components/home/Footer";
-import Container from "@/src/shared/ui/Container";
 
 
 export default function Home() {

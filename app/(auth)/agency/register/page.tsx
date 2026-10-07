@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
-import { Building2, Info, UserRound, Upload } from "lucide-react";
+import { Building2, Info, UserRound } from "lucide-react";
 import type { AppDispatch, RootState } from "@/src/shared/redux/store";
 import { clearAuthError, registerAgency } from "@/src/shared/redux/store/authSlice";
 import {
@@ -12,6 +12,7 @@ import {
   AuthField,
   AuthInput,
   AuthLinks,
+  AuthPasswordInput,
   AuthScaffold,
   AuthSelect,
   AuthSubmit,
@@ -64,6 +65,7 @@ export default function AgencyRegisterPage() {
     (state: RootState) => state.auth,
   );
   const [form, setForm] = useState<FormState>(initialState);
+  const [registrationStep, setRegistrationStep] = useState(1);
 
   function updateField<K extends keyof FormState>(field: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -114,17 +116,18 @@ export default function AgencyRegisterPage() {
       title="Register Your Travel Agency"
       subtitle="Create an agent workspace to manage bookings, customers, and agency operations."
       centered
-      centeredOuterMaxWidthClass="max-w-6xl"
-      centeredMaxWidthClass="max-w-5xl"
+      centeredOuterMaxWidthClass="max-w-4xl"
+      centeredMaxWidthClass="max-w-3xl"
+      contentClassName="w-full rounded-[1.5rem] border border-white/70 bg-white/90 p-4 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur sm:p-5"
     >
-      <div className="space-y-6">
+      <div className="space-y-4">
         <AuthCardTitle
           eyebrow="Agency signup"
           title="Create Agency Account"
           description="This flow creates the agency record, the first tenant owner account, and the link between them."
         />
 
-        <div className="rounded-[1.4rem] border border-sky-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(255,255,255,0.98))] p-5 shadow-sm sm:p-6">
+        <div className="rounded-[1.2rem] border border-sky-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(255,255,255,0.98))] p-3 shadow-sm sm:p-4">
           <div className="flex items-start gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-sm">
               <Info className="h-5 w-5" />
@@ -139,8 +142,31 @@ export default function AgencyRegisterPage() {
           </div>
         </div>
 
+        <div className="grid grid-cols-3 gap-2 text-center text-xs font-semibold text-slate-500">
+          {["Agency information", "Owner account", "Review & submit"].map((label, index) => {
+            const step = index + 1;
+            const active = registrationStep === step;
+            const complete = registrationStep > step;
+
+            return (
+              <div key={label} className="flex items-center gap-2">
+                <span
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs ${
+                    active || complete
+                      ? "border-sky-600 bg-sky-600 text-white"
+                      : "border-slate-200 bg-white text-slate-400"
+                  }`}
+                >
+                  {step}
+                </span>
+                <span className={active ? "text-sky-700" : "hidden sm:inline"}>{label}</span>
+              </div>
+            );
+          })}
+        </div>
+
         <form onSubmit={onSubmit} className="space-y-6">
-          <section className="space-y-6 rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] sm:p-6">
+          {registrationStep === 1 ? <section className="space-y-6 rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] sm:p-6">
             <div className="flex items-start gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-sm">
                 <Building2 className="h-5 w-5" />
@@ -151,7 +177,7 @@ export default function AgencyRegisterPage() {
                 </div>
                 <h3 className="mt-1 text-xl font-extrabold text-slate-950">Agency Information</h3>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Business details for the workspace that will be reviewed by the platform team.
+                  Enter the business details that will be reviewed before the workspace is approved.
                 </p>
               </div>
             </div>
@@ -219,48 +245,19 @@ export default function AgencyRegisterPage() {
               </AuthField>
 
               <AuthField
-                label="Agency logo"
-                htmlFor="agency_logo"
-                error={fieldErrors.agency_logo?.[0]}
+                label="Agency address"
+                htmlFor="address"
+                error={fieldErrors.address?.[0]}
                 optional
               >
-                <div className="flex min-h-12 flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 transition focus-within:border-sky-300 focus-within:bg-white focus-within:ring-4 focus-within:ring-sky-50">
-                  <label
-                    htmlFor="agency_logo"
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-200 hover:text-sky-700"
-                  >
-                    <Upload className="h-4 w-4" />
-                    Upload logo
-                  </label>
-                  <input
-                    id="agency_logo"
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={(event) =>
-                      updateField("agency_logo", event.target.files?.[0] ?? null)
-                    }
-                  />
-                  <span className="min-w-0 flex-1 truncate text-slate-500">
-                    {form.agency_logo ? form.agency_logo.name : "PNG, JPG up to 2MB"}
-                  </span>
-                </div>
+                <AuthInput
+                  id="address"
+                  placeholder="Enter full address"
+                  value={form.address}
+                  onChange={(event) => updateField("address", event.target.value)}
+                />
               </AuthField>
             </div>
-
-            <AuthField
-              label="Agency address"
-              htmlFor="address"
-              error={fieldErrors.address?.[0]}
-              optional
-            >
-              <AuthInput
-                id="address"
-                placeholder="Enter full address"
-                value={form.address}
-                onChange={(event) => updateField("address", event.target.value)}
-              />
-            </AuthField>
 
             <AuthField
               label="Short agency description"
@@ -275,9 +272,9 @@ export default function AgencyRegisterPage() {
                 onChange={(event) => updateField("description", event.target.value)}
               />
             </AuthField>
-          </section>
+          </section> : null}
 
-          <section className="space-y-6 rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] sm:p-6">
+          {registrationStep === 2 ? <section className="space-y-6 rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] sm:p-6">
             <div className="flex items-start gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-sm">
                 <UserRound className="h-5 w-5" />
@@ -288,7 +285,7 @@ export default function AgencyRegisterPage() {
                 </div>
                 <h3 className="mt-1 text-xl font-extrabold text-slate-950">Account Information</h3>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  The first tenant owner account for this agency workspace.
+                  Create the first owner account for this agency workspace.
                 </p>
               </div>
             </div>
@@ -324,7 +321,7 @@ export default function AgencyRegisterPage() {
               </AuthField>
 
               <AuthField label="Password" htmlFor="password" error={fieldErrors.password?.[0]} required>
-                <AuthInput
+                <AuthPasswordInput
                   id="password"
                   type="password"
                   placeholder="Enter password"
@@ -339,7 +336,7 @@ export default function AgencyRegisterPage() {
                 error={fieldErrors.password_confirmation?.[0]}
                 required
               >
-                <AuthInput
+                <AuthPasswordInput
                   id="password_confirmation"
                   type="password"
                   placeholder="Confirm password"
@@ -350,27 +347,73 @@ export default function AgencyRegisterPage() {
                 />
               </AuthField>
             </div>
-          </section>
+          </section> : null}
 
-          {error ? <AuthAlert tone="error" message={error} /> : null}
-          {successMessage ? <AuthAlert tone="success" message={successMessage} /> : null}
+          {registrationStep === 3 ? (
+            <>
+              <section className="space-y-4 rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] sm:p-6">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-sky-700">Final review</div>
+                  <h3 className="mt-1 text-xl font-extrabold text-slate-950">Check your application</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">Review the details before submitting the agency application.</p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <ReviewItem label="Agency" value={form.agency_name || "Not provided"} />
+                  <ReviewItem label="Business email" value={form.business_email || "Not provided"} />
+                  <ReviewItem label="Location" value={[form.city, form.country].filter(Boolean).join(", ") || "Not provided"} />
+                  <ReviewItem label="Owner" value={form.name || "Not provided"} />
+                  <ReviewItem label="Login email" value={form.email || "Not provided"} />
+                  <ReviewItem label="Logo" value={form.agency_logo?.name || "No logo selected"} />
+                </div>
+              </section>
 
-          <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 shadow-sm sm:p-5">
-            <AuthSubmit
-              label="Create Agency Account"
-              loadingLabel="Creating agency account..."
-              loading={requestStatus === "loading"}
-            />
+              {error ? <AuthAlert tone="error" message={error} /> : null}
+              {successMessage ? <AuthAlert tone="success" message={successMessage} /> : null}
+
+              <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 shadow-sm sm:p-5">
+                <AuthSubmit
+                  label="Create Agency Account"
+                  loadingLabel="Creating agency account..."
+                  loading={requestStatus === "loading"}
+                />
+              </div>
+            </>
+          ) : null}
+
+          <div className="flex items-center justify-between gap-3">
+            {registrationStep > 1 ? (
+              <button type="button" onClick={() => setRegistrationStep((step) => step - 1)} className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-sky-200 hover:text-sky-700">
+                Back
+              </button>
+            ) : <span />}
+
+            <div className="flex flex-wrap items-center justify-end gap-4">
+              <AuthLinks
+                inline
+                links={[
+                  { href: "/agency", label: "Want to learn more about Agent Workspace?" },
+                  { href: "/login", label: "Already registered? Login" },
+                ]}
+              />
+
+              {registrationStep < 3 ? (
+                <button type="button" onClick={() => setRegistrationStep((step) => step + 1)} className="rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700">
+                  {registrationStep === 1 ? "Continue" : "Review application"}
+                </button>
+              ) : null}
+            </div>
           </div>
         </form>
-
-        <AuthLinks
-          links={[
-            { href: "/agency", label: "Want to learn more about Agent Workspace?" },
-            { href: "/login", label: "Already registered? Login" },
-          ]}
-        />
       </div>
     </AuthScaffold>
+  );
+}
+
+function ReviewItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold text-slate-900">{value}</div>
+    </div>
   );
 }

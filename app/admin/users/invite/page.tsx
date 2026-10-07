@@ -13,6 +13,7 @@ import {
   AuthCardTitle,
   AuthField,
   AuthInput,
+  AuthPasswordInput,
   AuthScaffold,
   AuthSubmit,
 } from "@/src/shared/components/auth/AuthScaffold";
@@ -229,7 +230,7 @@ export default function TenantInvitationAcceptPage() {
                         htmlFor="password"
                         error={fieldErrors.password?.[0]}
                       >
-                        <AuthInput
+                        <AuthPasswordInput
                           id="password"
                           type="password"
                           autoComplete="new-password"
@@ -245,7 +246,7 @@ export default function TenantInvitationAcceptPage() {
                         htmlFor="password_confirmation"
                         error={fieldErrors.password_confirmation?.[0]}
                       >
-                        <AuthInput
+                        <AuthPasswordInput
                           id="password_confirmation"
                           type="password"
                           autoComplete="new-password"

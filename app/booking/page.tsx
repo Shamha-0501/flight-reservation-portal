@@ -184,17 +184,17 @@ function buildBaggageSelections(
         {
           id: "bag-10",
           label: "Add extra 10kg",
-          description: "Additional checked baggage allowance",
-          price: formatCurrencyAmount(35, currency),
-          amount: 35,
+          description: "Additional checked baggage allowance (estimated)",
+          price: formatCurrencyAmount(15000, currency),
+          amount: 15000,
           currency,
         },
         {
           id: "bag-20",
           label: "Add extra 20kg",
-          description: "Additional checked baggage allowance",
-          price: formatCurrencyAmount(60, currency),
-          amount: 60,
+          description: "Additional checked baggage allowance (estimated)",
+          price: formatCurrencyAmount(30000, currency),
+          amount: 30000,
           currency,
         },
       ],
@@ -421,7 +421,8 @@ export default function BookingPage() {
     if (seatMapError) {
       return {
         title: "Seat selection",
-        subtitle: seatMapError,
+        subtitle:
+          "Seat selection is currently unavailable for this offer. You can continue without choosing a seat.",
         ctaLabel: "Retry later",
         available: false,
       };
@@ -772,8 +773,10 @@ export default function BookingPage() {
         setCreatedOrder(response);
       } catch (error: unknown) {
         const message = getErrorMessage(error, "Order creation failed.");
-        setOrderCreationError(message);
-        throw new Error(`Payment was confirmed, but order creation failed: ${message}`);
+        setOrderCreationError(
+          "Your payment was received, but we could not confirm your booking. Please contact support before trying again."
+        );
+        throw new Error(message);
       } finally {
         setCreatingOrder(false);
       }
@@ -837,6 +840,8 @@ export default function BookingPage() {
               segments={selectedFlight.segments}
               baggageLabel={selectedFlight.baggageLabel}
               fare={selectedFlight.fare}
+              seatMapStatus={seatMapStatus}
+              seatMapLoading={loadingSeatMaps}
             />
           ) : null}
         </>
@@ -893,62 +898,84 @@ export default function BookingPage() {
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 bg-slate-50/70 px-5 py-4 sm:px-6">
             <div className="text-[12px] font-semibold uppercase tracking-[0.16em] text-blue-600">
-              Final review
+              Booking review
             </div>
             <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">
-              Ready to create order
+              Check your trip details
             </h3>
             <p className="mt-1.5 text-sm text-slate-600">
-              Check the backend order inputs before moving to card payment.
+              Please confirm the information below before moving to secure payment.
             </p>
           </div>
 
-          <div className="grid gap-3 p-5 text-sm text-slate-700 sm:p-6">
-            <ReviewRow label="Workspace ID" value={tenantKey || "-"} />
-            <ReviewRow label="Workspace key" value={tenantKey} />
-            <ReviewRow label="Offer ID" value={offerId || "-"} />
-            <ReviewRow
-              label="Passengers"
-              value={travellerOrderPayload?.passengers.length ?? 0}
-            />
-            <ReviewRow label="Agency markup" value={agencyMarkupLabel} />
-            <ReviewRow
-              label="Seat selections"
-              value={
-                extrasSelection?.seatServicesCount
-                  ? `${extrasSelection.seatServicesCount} seat${extrasSelection.seatServicesCount === 1 ? "" : "s"}`
-                  : "None"
-              }
-            />
-            <ReviewRow
-              label="Selected add-ons"
-              value={
-                extrasSelection?.totalAddonsAmount
-                  ? formatMoneyAmount(
-                      extrasSelection.totalAddonsAmount,
-                      normalizeCurrencyCode(extrasSelection?.currency ?? extrasCurrency)
-                    )
-                  : "Included"
-              }
-            />
+          <div className="space-y-5 p-5 sm:p-6">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">
+                Ticketing partner
+              </p>
+              <p className="mt-1 text-base font-semibold text-slate-950">{agentName}</p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ReviewSection title="Journey">
+                <ReviewRow label="Route" value={selectedFlight?.summary.route ?? "-"} />
+                <ReviewRow label="Travel date" value={selectedFlight?.summary.travelDate ?? "-"} />
+                <ReviewRow label="Duration" value={selectedFlight?.summary.duration ?? "-"} />
+                <ReviewRow label="Stops" value={selectedFlight?.summary.stops ?? "-"} />
+              </ReviewSection>
+
+              <ReviewSection title="Passengers and contact">
+                <ReviewRow label="Passengers" value={passengersLabel || "-"} />
+                <ReviewRow label="Contact email" value={travellerOrderPayload?.contact.email || "-"} />
+                <ReviewRow label="Flight segments" value={`${selectedFlight?.segments.length ?? 0}`} />
+              </ReviewSection>
+            </div>
+
+            <ReviewSection title="Baggage and extras">
+              <ReviewRow label="Baggage" value={selectedFlight?.baggageLabel ?? "-"} />
+              <ReviewRow label="Agency markup" value={agencyMarkupLabel} />
+              <ReviewRow
+                label="Additional add-ons"
+                value={
+                  extrasSelection?.selectedAddonIds.length
+                    ? `${extrasSelection.selectedAddonIds.length} selected · ${formatMoneyAmount(
+                        extrasSelection.totalAddonsAmount,
+                        normalizeCurrencyCode(extrasSelection.currency ?? extrasCurrency)
+                      )}`
+                    : "None selected"
+                }
+              />
+            </ReviewSection>
+
+            <ReviewSection title="Selected seats">
+              {extrasSelection?.seatServices?.length ? (
+                extrasSelection.seatServices.map((seat) => {
+                  const traveller = travellers.find(
+                    (item) => item.id === seat.passengerId
+                  );
+                  const seatPrice = formatMoneyAmount(
+                    seat.amount,
+                    normalizeCurrencyCode(seat.currency)
+                  );
+
+                  return (
+                    <ReviewRow
+                      key={`${seat.passengerId}:${seat.segmentId}:${seat.serviceId}`}
+                      label={traveller?.label ?? "Passenger"}
+                      value={`${seat.seatDesignator} · ${seatPrice}`}
+                    />
+                  );
+                })
+              ) : (
+                <ReviewRow label="Seats" value="None selected" />
+              )}
+            </ReviewSection>
           </div>
         </section>
       )}
 
       {currentStepIndex === 4 && (
         <div className="space-y-4">
-          {creatingOrder ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-              Creating backend order...
-            </div>
-          ) : null}
-
-          {orderCreationError ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-              {orderCreationError}
-            </div>
-          ) : null}
-
           <PaymentStep
             offerId={offerId}
             amountLabel={grandTotalLabel}
@@ -1033,5 +1060,20 @@ function ReviewRow({
       <span className="font-medium text-slate-500">{label}</span>
       <span className="font-semibold text-slate-950">{value}</span>
     </div>
+  );
+}
+
+function ReviewSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+      <h4 className="text-sm font-semibold text-slate-950">{title}</h4>
+      <div className="space-y-2">{children}</div>
+    </section>
   );
 }

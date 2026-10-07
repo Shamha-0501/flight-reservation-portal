@@ -54,9 +54,6 @@ export default function DateSelector({
             }}
             minDate={minDepart}
             dateFormat="EEE, d MMM"
-            showMonthDropdown
-            showYearDropdown
-            dropdownMode="select"
             popperPlacement="bottom-start"
             popperProps={{ strategy: "fixed" }}
             // ✅ avoids clipping without portalId
@@ -75,9 +72,6 @@ export default function DateSelector({
               onChange={(d: Date | null) => onChangeReturn(d)}
               minDate={minReturn}
               dateFormat="EEE, d MMM"
-              showMonthDropdown
-              showYearDropdown
-              dropdownMode="select"
               popperPlacement="bottom-start"
               popperProps={{ strategy: "fixed" }}
               popperContainer={({ children }) => <div>{children}</div>}

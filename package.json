@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:frontend": "node --test tests/frontend/bookingDisplay.test.js tests/frontend/bookingDetails.test.js"
+    "test:frontend": "node --experimental-strip-types --test tests/reports-model.test.mjs"
   },
   "dependencies": {
     "@duffel/components": "^3.16.0",

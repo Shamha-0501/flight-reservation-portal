@@ -27,7 +27,35 @@ export type BookingListItem = {
       amount?: string | number | null;
       currency?: string | null;
     };
+    booking_total?: {
+      amount?: string | number | null;
+      currency?: string | null;
+    };
     grand_total?: {
+      amount?: string | number | null;
+      currency?: string | null;
+    };
+    provider_total?: {
+      amount?: string | number | null;
+      currency?: string | null;
+    };
+    addons_total?: {
+      amount?: string | number | null;
+      currency?: string | null;
+    };
+    duffel_addons_total?: {
+      amount?: string | number | null;
+      currency?: string | null;
+    };
+    agency_addons_total?: {
+      amount?: string | number | null;
+      currency?: string | null;
+    };
+    agency_markup?: {
+      amount?: string | number | null;
+      currency?: string | null;
+    };
+    customer_total?: {
       amount?: string | number | null;
       currency?: string | null;
     };
@@ -37,7 +65,9 @@ export type BookingListItem = {
     name?: string | null;
   };
   passengers?: Array<{
-    id: number;
+    id: number | string;
+    duffel_passenger_id?: string | null;
+    passenger_id?: string | null;
     type?: string | null;
     title?: string | null;
     given_name?: string | null;

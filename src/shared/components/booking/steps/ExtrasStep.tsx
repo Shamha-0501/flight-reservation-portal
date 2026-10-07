@@ -179,9 +179,20 @@ export default function ExtrasStep({
   const [selectedSeatServices, setSelectedSeatServices] = useState<
     SeatServiceSelection[]
   >(initialSelection?.seatServices ?? []);
-  const hasHydratedSeatServicesRef = useRef(Boolean(initialSelection?.seatServices?.length));
+  const hydratedSelectionKeyRef = useRef<string | null>(null);
+  const lastEmittedSelectionRef = useRef<string | null>(null);
 
   useEffect(() => {
+    const travellerKey = baggageSelections
+      .map((traveller) => traveller.travellerId)
+      .join("|");
+    const hydrationKey = `${travellerKey}:${initialSelection ? "provided" : "empty"}`;
+
+    if (!travellerKey && !initialSelection) return;
+    if (hydratedSelectionKeyRef.current === hydrationKey) return;
+
+    hydratedSelectionKeyRef.current = hydrationKey;
+
     setSelectedBaggageByTraveller(
       baggageSelections.reduce<Record<string, string>>((acc, traveller) => {
         const initialOptionId =
@@ -200,15 +211,8 @@ export default function ExtrasStep({
     );
     setSelectedPolicyByGroup(initialSelection?.selectedPolicyByGroup ?? {});
     setSelectedAddonIds(initialSelection?.selectedAddonIds ?? []);
+    setSelectedSeatServices(initialSelection?.seatServices ?? []);
   }, [baggageSelections, initialSelection]);
-
-  useEffect(() => {
-    if (hasHydratedSeatServicesRef.current) return;
-    if (!initialSelection) return;
-
-    setSelectedSeatServices(initialSelection.seatServices ?? []);
-    hasHydratedSeatServicesRef.current = true;
-  }, [initialSelection]);
 
   const toggleAddon = (id: string) => {
     setSelectedAddonIds((prev) =>
@@ -313,7 +317,7 @@ export default function ExtrasStep({
   ]);
 
   useEffect(() => {
-    onSelectionChange?.({
+    const nextSelection: ExtrasOrderSelection = {
       selectedBaggageByTraveller,
       selectedPolicyByGroup,
       selectedAddonIds,
@@ -327,7 +331,13 @@ export default function ExtrasStep({
       duffelAddonsAmount: orderAddons.duffel_addons_amount ?? 0,
       totalAddonsAmount: orderAddons.total_addons_amount ?? 0,
       currency,
-    });
+    };
+
+    const signature = JSON.stringify(nextSelection);
+    if (lastEmittedSelectionRef.current === signature) return;
+
+    lastEmittedSelectionRef.current = signature;
+    onSelectionChange?.(nextSelection);
   }, [
     currency,
     onSelectionChange,

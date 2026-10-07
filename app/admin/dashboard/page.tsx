@@ -275,7 +275,7 @@ export default function AdminDashboardPage() {
               : "Quick signals from the current tenant workspace."
           }
         >
-          <div className="space-y-3">
+          <div className="grid grid-cols-4 gap-3">
             <SnapshotRow
               icon={Plane}
               label="Bookings this week"
@@ -382,8 +382,12 @@ export default function AdminDashboardPage() {
                   {"amount" in booking
                     ? booking.amount
                     : formatMoney(
-                        booking.amounts?.total?.amount,
-                        booking.amounts?.total?.currency,
+                        booking.amounts?.customer_total?.amount ??
+                          booking.amounts?.grand_total?.amount ??
+                          booking.amounts?.total?.amount,
+                        booking.amounts?.customer_total?.currency ??
+                          booking.amounts?.grand_total?.currency ??
+                          booking.amounts?.total?.currency,
                       )}
                 </td>
               </tr>
@@ -506,12 +510,12 @@ function SnapshotRow({
   value: string;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-blue-600">
-        <Icon className="h-5 w-5" />
+    <div className="flex min-h-[92px] items-center gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600">
+        <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0">
-        <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+        <div className="text-[10px] font-medium uppercase tracking-[0.1em] text-slate-500">
           {label}
         </div>
         <div className="mt-1 text-sm font-semibold text-slate-950">{value}</div>

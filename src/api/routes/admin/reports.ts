@@ -1,6 +1,6 @@
 import { http } from "../../config/http";
 
-export type AdminReportGroupBy = "week" | "month" | "year";
+export type AdminReportGroupBy = "day" | "week" | "month";
 export type AdminReportFormat = "csv" | "pdf";
 export type AdminReportScope = "platform" | "tenant";
 
@@ -75,8 +75,8 @@ export type AdminReportsPayload = {
     items: Array<{
       code: string;
       name: string;
-      usage: number;
-      value: { amount: string; currency: string };
+      usage_count: number;
+      revenue: { amount: string; currency: string };
     }>;
   };
   comparison: {
@@ -145,7 +145,7 @@ export async function getAdminReports(params: {
 } & AdminReportFilters): Promise<AdminReportsPayload> {
   try {
     const { scope, ...query } = params;
-    const endpoint = scope === "platform" ? "/api/admin/reports/platform" : "/api/tenants/reports";
+    const endpoint = scope === "platform" ? "/api/admin/reports" : "/api/tenants/reports";
     const response = await http.get<AdminReportsResponse>(endpoint, {
       params: query,
     });
@@ -170,7 +170,7 @@ export async function exportAdminReports(params: {
 } & AdminReportFilters) {
   try {
     const { scope, ...query } = params;
-    const endpoint = scope === "platform" ? "/api/admin/reports/platform/export" : "/api/tenants/reports/export";
+    const endpoint = scope === "platform" ? "/api/admin/reports/export" : "/api/tenants/reports/export";
     const response = await http.get(endpoint, {
       params: query,
       responseType: "blob",

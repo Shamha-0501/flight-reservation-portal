@@ -380,7 +380,7 @@ export default function SeatMapBrowser({
           </div>
         </div>
 
-        <aside className="min-h-0 space-y-3 pr-1 lg:sticky lg:top-0">
+        <aside className="min-h-0 space-y-3 overflow-y-auto pr-1 lg:sticky lg:top-0">
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
               Selected seats

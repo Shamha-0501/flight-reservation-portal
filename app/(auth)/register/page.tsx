@@ -14,6 +14,7 @@ import {
   AuthField,
   AuthInput,
   AuthLinks,
+  AuthPasswordInput,
   AuthScaffold,
   AuthSubmit,
 } from "@/src/shared/components/auth/AuthScaffold";
@@ -51,7 +52,10 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (successMessage) {
-      const timeout = window.setTimeout(() => router.push("/login"), 1200);
+      const timeout = window.setTimeout(
+        () => router.replace("/login?registered=1"),
+        1600,
+      );
       return () => window.clearTimeout(timeout);
     }
   }, [router, successMessage]);
@@ -64,12 +68,7 @@ export default function RegisterPage() {
   }
 
   useEffect(() => {
-    if (
-      localError ||
-      error ||
-      Object.keys(fieldErrors).length > 0 ||
-      successMessage
-    ) {
+    if (localError || error || Object.keys(fieldErrors).length > 0) {
       dispatch(clearAuthError());
       setLocalError(null);
     }
@@ -184,7 +183,7 @@ export default function RegisterPage() {
                   htmlFor="password"
                   error={fieldErrors.password?.[0]}
                 >
-                  <AuthInput
+                  <AuthPasswordInput
                     id="password"
                     type="password"
                     autoComplete="new-password"
@@ -200,7 +199,7 @@ export default function RegisterPage() {
                   htmlFor="password_confirmation"
                   error={fieldErrors.password_confirmation?.[0]}
                 >
-                  <AuthInput
+                  <AuthPasswordInput
                     id="password_confirmation"
                     type="password"
                     autoComplete="new-password"

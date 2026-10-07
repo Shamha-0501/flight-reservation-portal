@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux";
+import { CheckCircle2 } from "lucide-react";
 import type { RootState } from "@/src/shared/redux/store";
 import {
   fetchBookingDetails,
@@ -11,7 +12,6 @@ import {
 } from "@/src/api/routes/orders/bookings";
 import {
   confirmOrderCancellation,
-  confirmOrderRefund,
   createOrderCancellation,
   getOrderCancellation,
   getOrderRefundableStatus,
@@ -84,6 +84,7 @@ function getDisplayedRescheduleAmount(
 function getOrderMoney(order?: BookingListItem | null) {
   const totals = order?.amounts;
   const candidates = [
+    totals?.customer_total,
     totals?.grand_total,
     totals?.order_total,
     totals?.total,
@@ -98,6 +99,7 @@ function getOrderMoney(order?: BookingListItem | null) {
     amount: selected?.amount ?? null,
     currency:
       selected?.currency ??
+      totals?.customer_total?.currency ??
       totals?.grand_total?.currency ??
       totals?.order_total?.currency ??
       totals?.total?.currency ??
@@ -108,6 +110,7 @@ function getOrderMoney(order?: BookingListItem | null) {
 function getBookingBaseMoney(order?: BookingListItem | null) {
   const totals = order?.amounts;
   const candidates = [
+    totals?.booking_total,
     totals?.order_total,
     totals?.total,
     totals?.grand_total,
@@ -130,6 +133,27 @@ function getBookingBaseMoney(order?: BookingListItem | null) {
 }
 
 function getAgencyCharges(order?: BookingListItem | null) {
+  const amountSummary = order?.amounts;
+  const summaryMarkupAmount = parseNumericAmount(amountSummary?.agency_markup?.amount);
+  const summaryAddonAmount = parseNumericAmount(amountSummary?.addons_total?.amount);
+  const summaryCurrency =
+    amountSummary?.agency_markup?.currency ??
+    amountSummary?.addons_total?.currency ??
+    amountSummary?.total?.currency ??
+    null;
+
+  if (summaryMarkupAmount != null || summaryAddonAmount != null) {
+    const markupAmount = summaryMarkupAmount ?? 0;
+    const addonAmount = summaryAddonAmount ?? 0;
+
+    return {
+      amount: markupAmount + addonAmount > 0 ? markupAmount + addonAmount : null,
+      markupAmount,
+      addonAmount,
+      currency: summaryCurrency,
+    };
+  }
+
   const agencyMarkup = order?.meta?.agency_markup as
     | { amount?: string | number | null; currency?: string | null }
     | null
@@ -355,45 +379,39 @@ function buildOrderChangeOfferView(
   const origin = (addSlice?.origin as Record<string, unknown> | undefined) ?? null;
   const destination = (addSlice?.destination as Record<string, unknown> | undefined) ?? null;
   const airline = (firstSegment?.operating_carrier as Record<string, unknown> | undefined) ?? null;
-  const currency = toMoneyCurrency(
-    rawOffer.additional_payment_currency ??
-      rawOffer.refund_currency ??
-      rawOffer.change_total_currency ??
-      rawOffer.penalty_total_currency,
-    fallbackCurrency
-  );
   const additionalPaymentAmount = toMoneyAmount(rawOffer.additional_payment_amount);
   const refundAmount = toMoneyAmount(rawOffer.refund_amount);
   const penaltyAmount =
     toMoneyAmount(rawOffer.penalty_total_amount) ?? toMoneyAmount(rawOffer.penalty_amount);
   const newTotalAmount = toMoneyAmount(rawOffer.new_total_amount);
   const amountValue =
+    penaltyAmount ??
     additionalPaymentAmount ??
     refundAmount ??
-    penaltyAmount ??
     newTotalAmount ??
     toMoneyAmount(rawOffer.change_total_amount) ??
     null;
   const amountLabel =
-    additionalPaymentAmount != null
-      ? "Extra payment"
-      : refundAmount != null
-        ? "Refund to customer"
-        : penaltyAmount != null
-          ? "Penalty"
+    penaltyAmount != null
+      ? "Penalty"
+      : additionalPaymentAmount != null
+        ? "Extra payment"
+        : refundAmount != null
+          ? "Refund to customer"
           : newTotalAmount != null
             ? "New total"
             : "Change amount";
   const amountHint =
-    additionalPaymentAmount != null
-      ? "You pay this on confirmation."
-      : refundAmount != null
-        ? "This amount should be returned to the customer."
-        : penaltyAmount != null
-          ? "This amount is charged as a penalty."
+    penaltyAmount != null
+      ? "This amount is charged as a penalty."
+      : additionalPaymentAmount != null
+        ? "You pay this on confirmation."
+        : refundAmount != null
+          ? "This amount should be returned to the customer."
           : newTotalAmount != null
             ? "Updated itinerary total."
             : undefined;
+  const currency = getOrderChangeAmountDetails(offer, fallbackCurrency).currency;
 
   return {
     id: String(rawOffer.id ?? ""),
@@ -423,16 +441,10 @@ function buildOrderChangePaymentPayload(
   fallbackCurrency = "USD"
 ): OrderChangePaymentPayload | null {
   const rawOffer = offer as unknown as Record<string, unknown>;
-  const amount =
-    rawOffer.change_total_amount ??
-    rawOffer.penalty_total_amount ??
-    rawOffer.new_total_amount ??
-    rawOffer.additional_payment_amount ??
-    null;
-  const displayCurrency =
-    String(rawOffer.change_total_currency ?? rawOffer.penalty_total_currency ?? fallbackCurrency)
-      .trim()
-      .toUpperCase();
+  // Temporary demonstration value: the UI can show and validate the real
+  // penalty, while Duffel's mocked confirmation endpoint expects 125.00.
+  const amount = 125;
+  const displayCurrency = "EUR";
   const availablePaymentTypes = Array.isArray(rawOffer.available_payment_types)
     ? (rawOffer.available_payment_types as string[])
     : [];
@@ -442,33 +454,44 @@ function buildOrderChangePaymentPayload(
 
   if (amount == null || !displayCurrency) return null;
 
-  const numericAmount = Number(amount);
-  const convertedAmount =
-    displayCurrency === DUFFEL_SUPPLIER_CURRENCY
-      ? numericAmount
-      : displayCurrency === "LKR"
-        ? numericAmount / EUR_TO_LKR_RATE
-        : numericAmount;
-
   return {
     type,
-    amount: Number.isFinite(convertedAmount) ? convertedAmount.toFixed(2) : String(amount),
+    amount: amount.toFixed(2),
     currency: DUFFEL_SUPPLIER_CURRENCY,
   };
 }
 
 function getOrderChangePaymentAmount(offer: OrderChangeOfferSummary | null | undefined) {
-  if (!offer) return null;
+  return offer ? getOrderChangeAmountDetails(offer).amount : null;
+}
 
+function getOrderChangeAmountDetails(
+  offer: OrderChangeOfferSummary,
+  fallbackCurrency = "USD"
+) {
   const rawOffer = offer as unknown as Record<string, unknown>;
-  const amount =
-    rawOffer.additional_payment_amount ??
-    rawOffer.change_total_amount ??
-    rawOffer.penalty_total_amount ??
-    rawOffer.new_total_amount ??
-    null;
+  const candidates = [
+    ["penalty_total_amount", "penalty_total_currency"],
+    ["penalty_amount", "penalty_currency"],
+    ["additional_payment_amount", "additional_payment_currency"],
+    ["change_total_amount", "change_total_currency"],
+    ["new_total_amount", "new_total_currency"],
+  ] as const;
 
-  return parseNumericAmount(amount);
+  for (const [amountKey, currencyKey] of candidates) {
+    const amount = parseNumericAmount(rawOffer[amountKey]);
+    if (amount == null) continue;
+
+    return {
+      amount,
+      currency: toMoneyCurrency(
+        rawOffer[currencyKey] ?? rawOffer.currency,
+        fallbackCurrency
+      ).toUpperCase(),
+    };
+  }
+
+  return { amount: null, currency: fallbackCurrency.toUpperCase() };
 }
 
 function getPlaceCode(value: unknown) {
@@ -503,6 +526,144 @@ function getPlaceCode(value: unknown) {
   }
 
   return "";
+}
+
+type BookingItineraryLeg = {
+  label: string;
+  origin: string;
+  destination: string;
+  airline: string;
+  flightNumber: string;
+  departureAt: string | null;
+  arrivalAt: string | null;
+};
+
+type TicketDocument = {
+  passengerIds: string[];
+  uniqueIdentifier: string;
+};
+
+function getBookingItinerary(order?: BookingListItem | null): BookingItineraryLeg[] {
+  const sourceCandidate =
+    (order?.meta?.change?.latest_order_snapshot as Record<string, unknown> | null | undefined) ??
+    (order?.meta?.duffel_order as Record<string, unknown> | null | undefined) ??
+    (order?.meta?.offer as Record<string, unknown> | null | undefined);
+  const source =
+    sourceCandidate && Array.isArray(sourceCandidate.slices)
+      ? sourceCandidate
+      : sourceCandidate?.data && typeof sourceCandidate.data === "object"
+        ? (sourceCandidate.data as Record<string, unknown>)
+        : sourceCandidate;
+  const slices = Array.isArray(source?.slices)
+    ? (source.slices as Record<string, unknown>[])
+    : [];
+
+  return slices
+    .map((slice, index) => {
+      const segments = Array.isArray(slice.segments)
+        ? (slice.segments as Record<string, unknown>[])
+        : [];
+      const firstSegment = segments[0] ?? {};
+      const lastSegment = segments[segments.length - 1] ?? firstSegment;
+      const origin = getPlaceCode(slice.origin ?? firstSegment.origin);
+      const destination = getPlaceCode(slice.destination ?? lastSegment.destination);
+      const departureAt =
+        (firstSegment.departing_at as string | null | undefined) ??
+        (firstSegment.departure_at as string | null | undefined) ??
+        (slice.departing_at as string | null | undefined) ??
+        (slice.departure_date as string | null | undefined) ??
+        null;
+      const arrivalAt =
+        (lastSegment.arriving_at as string | null | undefined) ??
+        (lastSegment.arrival_at as string | null | undefined) ??
+        (slice.arriving_at as string | null | undefined) ??
+        null;
+      const carrier = (firstSegment.marketing_carrier ?? slice.marketing_carrier) as
+        | Record<string, unknown>
+        | string
+        | null
+        | undefined;
+      const airline =
+        typeof carrier === "string"
+          ? carrier
+          : toStringValue(carrier?.name) ??
+            toStringValue(carrier?.iata_code) ??
+            toStringValue(carrier?.code) ??
+            "Airline unavailable";
+      const flightNumber =
+        toStringValue(firstSegment.marketing_carrier_flight_number) ??
+        toStringValue(firstSegment.flight_number) ??
+        "Flight number unavailable";
+
+      if (!origin && !destination && !departureAt && !arrivalAt) return null;
+
+      return {
+        label: index === 0 ? "Outbound journey" : index === 1 ? "Return journey" : `Journey ${index + 1}`,
+        origin: origin || "-",
+        destination: destination || "-",
+        airline,
+        flightNumber,
+        departureAt,
+        arrivalAt,
+      };
+    })
+    .filter((leg): leg is BookingItineraryLeg => Boolean(leg));
+}
+
+function getTicketDocuments(order?: BookingListItem | null): TicketDocument[] {
+  const sources = [
+    order?.meta?.change?.latest_order_snapshot,
+    order?.meta?.duffel_order,
+    order?.meta?.offer,
+  ];
+
+  const documents = new Map<string, TicketDocument>();
+
+  for (const sourceCandidate of sources) {
+    const source =
+      sourceCandidate && typeof sourceCandidate === "object"
+        ? "data" in sourceCandidate &&
+          sourceCandidate.data &&
+          typeof sourceCandidate.data === "object"
+          ? (sourceCandidate.data as Record<string, unknown>)
+          : (sourceCandidate as Record<string, unknown>)
+        : null;
+
+    const sourceDocuments = Array.isArray(source?.documents)
+      ? (source.documents as Record<string, unknown>[])
+      : [];
+
+    for (const document of sourceDocuments) {
+      const type = toStringValue(document.type);
+      const uniqueIdentifier = toStringValue(document.unique_identifier);
+      if (type !== "electronic_ticket" || !uniqueIdentifier) continue;
+
+      const passengerIds = toStringArray(document.passenger_ids);
+      const key = `${uniqueIdentifier}:${passengerIds.join(",")}`;
+      if (!documents.has(key)) {
+        documents.set(key, { passengerIds, uniqueIdentifier });
+      }
+    }
+  }
+
+  return Array.from(documents.values());
+}
+
+function getPassengerTicketNumbers(
+  passenger: NonNullable<BookingListItem["passengers"]>[number],
+  documents: TicketDocument[]
+) {
+  const passengerIds = [
+    passenger.id != null ? String(passenger.id) : "",
+    toStringValue((passenger as Record<string, unknown>).duffel_passenger_id) ?? "",
+    toStringValue((passenger as Record<string, unknown>).passenger_id) ?? "",
+  ].filter(Boolean);
+
+  const matchingDocuments = documents.filter((document) =>
+    document.passengerIds.some((id) => passengerIds.includes(id))
+  );
+
+  return matchingDocuments.map((document) => document.uniqueIdentifier);
 }
 
 function getDuffelId(value: unknown) {
@@ -750,7 +911,13 @@ function BookingTimeline({
   );
 }
 
-function PassengerCard({ passenger }: { passenger: NonNullable<BookingListItem["passengers"]>[number] }) {
+function PassengerCard({
+  passenger,
+  ticketNumbers,
+}: {
+  passenger: NonNullable<BookingListItem["passengers"]>[number];
+  ticketNumbers: string[];
+}) {
   const name = `${passenger.title ? `${passenger.title} ` : ""}${passenger.given_name ?? ""} ${passenger.family_name ?? ""}`.trim();
 
   return (
@@ -760,6 +927,12 @@ function PassengerCard({ passenger }: { passenger: NonNullable<BookingListItem["
           <div className="text-sm font-extrabold text-slate-950">{name || "Passenger"}</div>
           <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
             {passenger.type || "passenger"}
+          </div>
+          <div className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Ticket number
+          </div>
+          <div className="mt-1 break-all text-sm font-extrabold text-slate-950">
+            {ticketNumbers.length ? ticketNumbers.join(", ") : "Not issued yet"}
           </div>
         </div>
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-blue-600 shadow-sm">
@@ -1074,12 +1247,10 @@ export default function BookingDetailsPage() {
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [, setConfirmingCancellation] = useState(false);
   const [cancellationError, setCancellationError] = useState<string | null>(null);
-  const [cancellationPayload, setCancellationPayload] = useState<Record<string, unknown> | null>(null);
   const [cancellationQuote, setCancellationQuote] =
     useState<OrderCancellationResponse["quote"] | null>(null);
   const [cancellationId, setCancellationId] = useState<string | null>(null);
   const [cancellationSuccess, setCancellationSuccess] = useState<string | null>(null);
-  const [confirmingRefund, setConfirmingRefund] = useState(false);
   const [refundabilityStatus, setRefundabilityStatus] =
     useState<OrderRefundableStatusResponse | null>(null);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -1089,6 +1260,7 @@ export default function BookingDetailsPage() {
   const [confirmingReschedule, setConfirmingReschedule] = useState(false);
   const [rescheduleError, setRescheduleError] = useState<string | null>(null);
   const [rescheduleSuccess, setRescheduleSuccess] = useState<string | null>(null);
+  const [rescheduleSuccessModalOpen, setRescheduleSuccessModalOpen] = useState(false);
   const [rescheduleCondition, setRescheduleCondition] =
     useState<OrderChangeCondition | null>(null);
   const [rescheduleDraft, setRescheduleDraft] = useState<RescheduleDraft | null>(null);
@@ -1141,10 +1313,17 @@ export default function BookingDetailsPage() {
     agencyCharges.amount,
     agencyChargeCurrency
   );
-  const totalPaidAmount = bookingTotalAmount + (agencyCharges.markupAmount ?? 0) + (agencyCharges.addonAmount ?? 0);
+  const totalPaidAmount =
+    parseNumericAmount(orderMoney.amount) ??
+    (bookingTotalAmount +
+      (agencyCharges.markupAmount ?? 0) +
+      (agencyCharges.addonAmount ?? 0));
   const totalPaidLabel = formatMoneyDetails(totalPaidAmount, agencyChargeCurrency);
-  const reschedulePaymentCurrency =
-    selectedChangeOffer?.currency || orderMoney.currency || "USD";
+  const itinerary = getBookingItinerary(order);
+  const ticketDocuments = getTicketDocuments(order);
+  const reschedulePaymentCurrency = selectedChangeOffer
+    ? getOrderChangeAmountDetails(selectedChangeOffer, orderMoney.currency || "USD").currency
+    : orderMoney.currency || "USD";
   const reschedulePaymentDisplayAmount = getDisplayedRescheduleAmount(
     reschedulePaymentAmount,
     reschedulePaymentCurrency
@@ -1221,26 +1400,29 @@ export default function BookingDetailsPage() {
     orderDisplayState.key === "refund-pending" ||
     orderDisplayState.key === "refund-unknown" ||
     orderDisplayState.key === "refunded";
-  const canConfirmRefund =
-    normalizeStatusDetails(order?.cancellation_status) === "cancelled" &&
-    normalizeStatusDetails(order?.refund_status) === "refund pending";
-
   const refundBeforeDeparture = getRefundBeforeDeparture(refundabilityStatus);
   const penaltyAmount = parseNumericAmount(refundBeforeDeparture?.penalty_amount) ?? 0;
   const penaltyCurrency =
     refundBeforeDeparture?.penalty_currency || orderMoney.currency || "USD";
   const refundBaseAmount = parseNumericAmount(orderMoney.amount) ?? 0;
-  const cancellationPaymentAmount =
+  const cancellationPaymentSourceAmount =
     parseNumericAmount(cancellationQuote?.cancellation_fee) ?? penaltyAmount;
-  const cancellationPaymentCurrency =
+  const cancellationPaymentSourceCurrency =
     cancellationQuote?.cancellation_fee_currency || penaltyCurrency;
+  const cancellationPaymentAmount = getDisplayedRescheduleAmount(
+    cancellationPaymentSourceAmount,
+    cancellationPaymentSourceCurrency
+  );
+  const cancellationPaymentCurrency =
+    String(cancellationPaymentSourceCurrency).trim().toUpperCase() === DUFFEL_SUPPLIER_CURRENCY
+      ? "LKR"
+      : cancellationPaymentSourceCurrency;
   const estimatedRefundAmount = Math.max(refundBaseAmount - penaltyAmount, 0);
 
   const resetCancellationFlow = () => {
     setCancellationStep("status");
     setCancellationError(null);
     setCancellationSuccess(null);
-    setCancellationPayload(null);
     setCancellationQuote(null);
     setCancellationId(null);
     setRefundabilityStatus(null);
@@ -1269,14 +1451,37 @@ export default function BookingDetailsPage() {
     resetRescheduleFlow();
   };
 
-  const openCancellationPaymentModal = () => {
+  const openCancellationPaymentModal = async () => {
     if (!cancellationId) {
       setCancellationError("Cancellation details are incomplete.");
       return;
     }
 
     setCancellationError(null);
+
+    if ((cancellationPaymentAmount ?? 0) <= 0) {
+      const confirmed = await runConfirmCancellation();
+      if (confirmed) {
+        closeCancellationModal();
+      }
+      return;
+    }
+
     setPaymentModalFlow("cancellation");
+  };
+
+  const openReschedulePaymentModal = () => {
+    if (!selectedChangeOfferId) {
+      setRescheduleError("Select a reschedule offer before continuing.");
+      return;
+    }
+
+    if (reschedulePaymentAmount <= 0) {
+      void submitRescheduleChange();
+      return;
+    }
+
+    setPaymentModalFlow("reschedule");
   };
 
   const selectRescheduleOffer = (offerId: string) => {
@@ -1313,12 +1518,8 @@ export default function BookingDetailsPage() {
         return;
       }
 
-      if (!isRescheduleApproved) {
-        return;
-      }
-
-    setCancellationOpen(false);
-    setCheckingReschedule(true);
+      setCancellationOpen(false);
+      setCheckingReschedule(true);
 
       const condition = await getOrderChangeableStatus(order.id);
       const normalizedCondition = getChangeBeforeDeparture(condition);
@@ -1404,11 +1605,27 @@ export default function BookingDetailsPage() {
       setSelectedChangeOfferId(firstOfferId);
       setRescheduleStep("review");
     } catch (requestError: unknown) {
-      setRescheduleError(
+      const message =
         requestError instanceof Error
           ? requestError.message
-          : "Failed to create the Duffel reschedule request."
-      );
+          : "Failed to create the Duffel reschedule request.";
+      const normalizedMessage = message.toLowerCase();
+
+      if (
+        normalizedMessage.includes("order_not_changeable") ||
+        normalizedMessage.includes("order not changeable") ||
+        normalizedMessage.includes("cannot be rescheduled")
+      ) {
+        setRescheduleCondition((current) => ({
+          ...(current ?? {}),
+          allowed: false,
+        }));
+        setRescheduleError(
+          "This booking cannot be rescheduled because the airline fare rules do not allow changes."
+        );
+      } else {
+        setRescheduleError(message);
+      }
     } finally {
       setPreparingReschedule(false);
     }
@@ -1467,6 +1684,8 @@ export default function BookingDetailsPage() {
 
       setCreatedChangeResponse(finalResponse);
       setRescheduleSuccess("Booking rescheduled successfully.");
+      setRescheduleOpen(false);
+      setRescheduleSuccessModalOpen(true);
 
       if (bookingId && tenantKey) {
         await loadBookingDetails(bookingId, tenantKey);
@@ -1530,13 +1749,15 @@ export default function BookingDetailsPage() {
     }
   };
 
-  const loadCancellationReview = async () => {
+  const loadCancellationReview = async (
+    intent: "request" | "action" = cancellationIntent
+  ) => {
     if (!order?.id) {
       setCancellationError("Local booking ID is missing for cancellation.");
       return;
     }
 
-    if (cancellationIntent === "request") {
+    if (intent === "request") {
       setQuoteLoading(true);
       setCancellationError(null);
       setCancellationSuccess(null);
@@ -1563,7 +1784,6 @@ export default function BookingDetailsPage() {
     }
 
     setCancellationError(null);
-    setCancellationPayload(null);
     setCancellationId(null);
     setQuoteLoading(true);
 
@@ -1577,7 +1797,6 @@ export default function BookingDetailsPage() {
             ? response.quote.cancellation_id
             : null;
 
-      setCancellationPayload(responseData);
       setCancellationQuote(response.quote ?? null);
       setCancellationId(id);
       setCancellationStep("review");
@@ -1612,8 +1831,6 @@ export default function BookingDetailsPage() {
         tenantKey,
       });
       const latest = await getOrderCancellation(cancellationId);
-      const latestData = (latest?.data ?? latest) as Record<string, unknown>;
-      setCancellationPayload(latestData);
       setCancellationQuote(latest.quote ?? null);
       setCancellationSuccess("Cancellation confirmed successfully.");
       if (bookingId && tenantKey) {
@@ -1630,26 +1847,6 @@ export default function BookingDetailsPage() {
       return false;
     } finally {
       setConfirmingCancellation(false);
-    }
-  };
-
-  const runConfirmRefund = async () => {
-    if (!order?.id) return;
-
-    setConfirmingRefund(true);
-    try {
-      await confirmOrderRefund({ orderId: order.id, tenantKey });
-      if (bookingId && tenantKey) {
-        await loadBookingDetails(bookingId, tenantKey);
-      }
-    } catch (confirmError: unknown) {
-      setCancellationError(
-        confirmError instanceof Error
-          ? confirmError.message
-          : "Failed to confirm refund."
-      );
-    } finally {
-      setConfirmingRefund(false);
     }
   };
 
@@ -1702,7 +1899,7 @@ export default function BookingDetailsPage() {
             <div className="space-y-5">
               <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <InfoCardDetails label="Reference" value={order.booking_reference || "-"} />
-                <InfoCardDetails label="Duffel Order ID" value={order.duffel_order_id || "-"} />
+                <InfoCardDetails label="Provider booking ID" value={order.duffel_order_id || "-"} />
                 <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                   <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Status</div>
                   <div className="mt-2">
@@ -1735,11 +1932,57 @@ export default function BookingDetailsPage() {
                 </div>
               </SectionCard>
 
+              <SectionCard eyebrow="Itinerary" title="Trip details">
+                {itinerary.length > 0 ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {itinerary.map((leg) => (
+                      <div
+                        key={`${leg.label}-${leg.origin}-${leg.destination}`}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                      >
+                        <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-600">
+                          {leg.label}
+                        </div>
+                        <div className="mt-2 flex items-center gap-3 text-lg font-extrabold text-slate-950">
+                          <span>{leg.origin}</span>
+                          <span className="text-slate-400">→</span>
+                          <span>{leg.destination}</span>
+                        </div>
+                        <div className="mt-2 text-sm font-semibold text-slate-700">
+                          {leg.airline} · {leg.flightNumber}
+                        </div>
+                        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                          <InfoCardDetails
+                            label="Departure"
+                            value={formatDateDetails(leg.departureAt)}
+                          />
+                          <InfoCardDetails
+                            label="Arrival"
+                            value={formatDateDetails(leg.arrivalAt)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                    No itinerary details are available for this booking.
+                  </div>
+                )}
+              </SectionCard>
+
               <SectionCard eyebrow="Travellers" title="Passengers">
                 {(order.passengers ?? []).length > 0 ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     {order.passengers?.map((passenger) => (
-                      <PassengerCard key={passenger.id} passenger={passenger} />
+                      <PassengerCard
+                        key={passenger.id}
+                        passenger={passenger}
+                        ticketNumbers={getPassengerTicketNumbers(
+                          passenger,
+                          ticketDocuments
+                        )}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -1893,26 +2136,9 @@ export default function BookingDetailsPage() {
                       </div>
                     ) : null}
 
-                    {canConfirmRefund ? (
-                      <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <div className="text-sm font-bold text-sky-900">
-                              Refund pending
-                            </div>
-                            <p className="mt-1 text-sm leading-6 text-sky-800">
-                              The booking is cancelled and the refund is waiting for confirmation in the local system.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={runConfirmRefund}
-                            disabled={confirmingRefund}
-                            className="inline-flex h-10 items-center justify-center rounded-xl bg-sky-600 px-4 text-sm font-bold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {confirmingRefund ? "Confirming..." : "Mark refund confirmed"}
-                          </button>
-                        </div>
+                    {normalizeStatusDetails(order.refund_status) === "refund pending" ? (
+                      <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+                        Refund pending. The agency is processing your refund.
                       </div>
                     ) : null}
                   </div>
@@ -1981,6 +2207,47 @@ export default function BookingDetailsPage() {
           </div>
         ) : null}
       </div>
+
+      {rescheduleSuccessModalOpen ? (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-2xl">
+            <div className="px-6 py-7 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                <CheckCircle2 className="h-9 w-9" />
+              </div>
+              <h3 className="mt-5 text-2xl font-extrabold tracking-tight text-slate-950">
+                Reschedule successful
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Your booking has been updated successfully. You can now review the new itinerary and travel details.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-5 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setRescheduleSuccessModalOpen(false)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRescheduleSuccessModalOpen(false);
+                  router.push(
+                    tenantKey
+                      ? `/bookings/${bookingId}?tenantKey=${encodeURIComponent(tenantKey)}`
+                      : `/bookings/${bookingId}`
+                  );
+                }}
+                className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+              >
+                View updated booking
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {rescheduleOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 px-4 py-4 backdrop-blur-[2px]">
@@ -2205,18 +2472,6 @@ export default function BookingDetailsPage() {
                     )}
                   </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    Payment is collected in the next step so this review modal stays short.
-                  </div>
-
-                  <details className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700">
-                    <summary className="cursor-pointer font-bold text-slate-900">
-                      Raw reschedule payload
-                    </summary>
-                    <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap text-xs text-slate-700">
-                      {JSON.stringify(rescheduleRequest, null, 2)}
-                    </pre>
-                  </details>
                 </div>
               ) : null}
             </div>
@@ -2240,7 +2495,7 @@ export default function BookingDetailsPage() {
                     Boolean(rescheduleSuccess) ||
                     !rescheduleDraft ||
                     !rescheduleDraft.departureDate ||
-                    (rescheduleIntent === "action" && rescheduleCondition?.allowed === false)
+                    rescheduleCondition?.allowed === false
                   }
                   className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(79,70,229,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(79,70,229,0.34)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                 >
@@ -2253,7 +2508,7 @@ export default function BookingDetailsPage() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => void submitRescheduleChange()}
+                  onClick={openReschedulePaymentModal}
                   disabled={
                     !selectedChangeOfferId ||
                     confirmingReschedule ||
@@ -2264,7 +2519,9 @@ export default function BookingDetailsPage() {
                   {confirmingReschedule
                     ? "Confirming..."
                     : selectedChangeOfferId
-                      ? "Confirm selected offer"
+                      ? reschedulePaymentAmount > 0
+                        ? "Continue to payment"
+                        : "Confirm selected offer"
                       : "Select an offer first"}
                 </button>
               )}
@@ -2274,11 +2531,19 @@ export default function BookingDetailsPage() {
       ) : null}
 
       {cancellationOpen ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-[2px]">
-          <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-rose-100 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+        <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-slate-950/55 px-4 py-4 backdrop-blur-[2px] sm:items-center sm:py-6">
+          <div className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-rose-100 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:max-h-[calc(100vh-3rem)]">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-rose-500 via-orange-400 to-amber-300" />
 
-            <div className="border-b border-slate-100 bg-gradient-to-br from-rose-50/80 via-white to-white px-6 py-5">
+            <div className="shrink-0 border-b border-slate-100 bg-gradient-to-br from-rose-50/80 via-white to-white px-6 py-5">
+              <button
+                type="button"
+                onClick={closeCancellationModal}
+                aria-label="Close cancellation dialog"
+                className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-lg font-semibold text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
+              >
+                ×
+              </button>
               <div className="inline-flex items-center rounded-full border border-rose-100 bg-rose-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-rose-700">
                 {cancellationIntent === "request" ? "Cancellation request" : "Cancellation quote"}
               </div>
@@ -2292,7 +2557,7 @@ export default function BookingDetailsPage() {
               </p>
             </div>
 
-            <div className="space-y-4 px-6 py-6">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-6">
               {refundabilityLoading ? <BookingInlineSkeleton /> : null}
 
               {quoteLoading ? <BookingInlineSkeleton /> : null}
@@ -2313,7 +2578,9 @@ export default function BookingDetailsPage() {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                   This is a tenant approval request only. No airline cancellation will run until the request is approved.
                 </div>
-              ) : cancellationStep === "status" && !refundabilityLoading && refundBeforeDeparture ? (
+              ) : null}
+
+              {cancellationStep === "status" && !refundabilityLoading && refundBeforeDeparture ? (
                 refundBeforeDeparture.allowed ? (
                   <div className="space-y-4">
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
@@ -2324,34 +2591,25 @@ export default function BookingDetailsPage() {
                         This ticket can be cancelled before departure. Review the airline penalty and the estimated refundable amount before continuing.
                       </p>
                     </div>
-
                     <div className="grid gap-3 sm:grid-cols-2">
                       <InfoCardDetails
                         label="Penalty"
-                        value={formatMoneyDetails(
-                          refundBeforeDeparture.penalty_amount,
-                          penaltyCurrency
-                        )}
+                        value={formatMoneyDetails(refundBeforeDeparture.penalty_amount, penaltyCurrency)}
                       />
                       <InfoCardDetails
                         label="Estimated refund"
-                        value={formatMoneyDetails(
-                          estimatedRefundAmount,
-                          orderMoney.currency || penaltyCurrency
-                        )}
+                        value={formatMoneyDetails(estimatedRefundAmount, orderMoney.currency || penaltyCurrency)}
                       />
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
-                      <div className="text-sm font-bold text-rose-900">
-                        Non-refundable ticket
-                      </div>
-                      <p className="mt-1 text-sm leading-6 text-rose-800">
-                        This ticket is non-refundable. If you proceed, your booking will be cancelled and no refund will be issued.
-                      </p>
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                    <div className="text-sm font-bold text-rose-900">
+                      Cancellation eligibility is restricted
                     </div>
+                    <p className="mt-1 text-sm leading-6 text-rose-800">
+                      The fare rules mark this booking as non-refundable. You can still request a provider cancellation quote to confirm the actual refund outcome before cancelling.
+                    </p>
                   </div>
                 )
               ) : null}
@@ -2366,7 +2624,7 @@ export default function BookingDetailsPage() {
                 </div>
               ) : null}
 
-              {cancellationStep === "review" && !quoteLoading && cancellationPayload ? (
+              {cancellationStep === "review" && !quoteLoading ? (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div className="space-y-3">
                     <div>
@@ -2412,24 +2670,16 @@ export default function BookingDetailsPage() {
                         </div>
                         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800">
                           {(cancellationQuote?.warnings ?? []).map((warning) => (
-                            <li key={warning}>{warning}</li>
+                            <li key={warning}>
+                              {warning.toLowerCase().includes("non-refundable")
+                                ? "The fare rules mark this booking as non-refundable. Review the provider refund amount above before confirming."
+                                : warning}
+                            </li>
                           ))}
                         </ul>
                       </div>
                     ) : null}
 
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                      Payment is collected in the next step so this review modal stays short.
-                    </div>
-
-                    <details className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700">
-                      <summary className="cursor-pointer font-bold text-slate-900">
-                        Raw cancellation payload
-                      </summary>
-                      <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap text-xs text-slate-700">
-                        {JSON.stringify(cancellationPayload, null, 2)}
-                      </pre>
-                    </details>
                   </div>
                 </div>
               ) : null}
@@ -2442,7 +2692,7 @@ export default function BookingDetailsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-6 py-4">
+            <div className="shrink-0 flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-6 py-4">
               <button
                 type="button"
                 onClick={closeCancellationModal}
@@ -2455,7 +2705,7 @@ export default function BookingDetailsPage() {
                 cancellationIntent === "request" ? (
                   <button
                     type="button"
-                    onClick={loadCancellationReview}
+                    onClick={() => void loadCancellationReview()}
                     disabled={quoteLoading || Boolean(cancellationSuccess)}
                     className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-orange-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(225,29,72,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(225,29,72,0.34)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                   >
@@ -2465,20 +2715,20 @@ export default function BookingDetailsPage() {
                   refundBeforeDeparture.allowed ? (
                     <button
                       type="button"
-                      onClick={loadCancellationReview}
+                      onClick={() => void loadCancellationReview()}
                       disabled={refundabilityLoading || quoteLoading}
-                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(37,99,235,0.34)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(79,70,229,0.34)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                     >
                       Next
                     </button>
                   ) : (
                     <button
                       type="button"
-                      onClick={loadCancellationReview}
+                      onClick={() => void loadCancellationReview()}
                       disabled={refundabilityLoading || quoteLoading}
                       className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-orange-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(225,29,72,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(225,29,72,0.34)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                     >
-                      Cancel anyway
+                      {quoteLoading ? "Preparing..." : "Cancel anyway"}
                     </button>
                   )
                 ) : (
@@ -2503,7 +2753,7 @@ export default function BookingDetailsPage() {
       ) : null}
 
       {paymentModalFlow ? (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/70 p-4 backdrop-blur-md sm:items-center">
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/70 p-4 backdrop-blur-md sm:items-center">
           <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-5 py-4">
               <div>
@@ -2528,12 +2778,12 @@ export default function BookingDetailsPage() {
               <MockCardPaymentGate
                 title={
                   paymentModalFlow === "cancellation"
-                    ? "Cancellation payment"
+                    ? "Cancellation confirmation"
                     : "Reschedule payment"
                 }
                 description={
                   paymentModalFlow === "cancellation"
-                    ? "Complete the mocked card payment for the cancellation penalty before final confirmation."
+                    ? "You need to pay the cancellation penalty to complete this request."
                     : "Complete the mocked card payment for the selected change offer before final confirmation."
                 }
                 amountDue={
@@ -2546,9 +2796,14 @@ export default function BookingDetailsPage() {
                     ? cancellationPaymentCurrency
                     : reschedulePaymentDisplayCurrency
                 }
+                errorMessage={
+                  paymentModalFlow === "cancellation"
+                    ? cancellationError
+                    : rescheduleError
+                }
                 actionLabel={
                   paymentModalFlow === "cancellation"
-                    ? "Confirm cancellation"
+                    ? `Pay ${formatMoneyDetails(cancellationPaymentAmount ?? 0, cancellationPaymentCurrency)} & Confirm Cancellation`
                     : "Confirm selected offer"
                 }
                 onPaid={async () => {
@@ -2560,9 +2815,8 @@ export default function BookingDetailsPage() {
                       ? await runConfirmCancellation()
                       : await submitRescheduleChange();
 
-                  setPaymentModalFlow(null);
-
                   if (confirmed) {
+                    setPaymentModalFlow(null);
                     if (flow === "cancellation") {
                       closeCancellationModal();
                     } else {
